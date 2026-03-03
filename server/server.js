@@ -31,6 +31,18 @@ app.get('/', (req, res) => {
     res.send('LTTS Test Portal API is running!');
 });
 
+// --- Add login route for frontend ---
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
+
+    if(email === 'admin@ltts.com' && password === 'admin123') {
+        return res.json({ success: true, token: 'dummy-token' });
+    } else {
+        return res.status(401).json({ success: false, message: 'Invalid email/password' });
+    }
+});
+// --- End of login route ---
+
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/tests', require('./routes/testRoutes'));
