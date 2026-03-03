@@ -32,14 +32,7 @@ app.use('/api/tests', require('./routes/testRoutes'));
 app.use('/api/attempts', require('./routes/attemptRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 
-// Serve static assets in production (optional monolith mode)
-if (process.env.NODE_ENV === 'production') {
-    app.use(express.static(path.join(__dirname, '../client/dist/client/browser')));
 
-    app.get(/(.*)/, (req, res) => {
-        // Build path depends on angular.json output
-        res.sendFile(path.resolve(__dirname, '../client/dist/client/browser/index.html'));
-    });
 } else {
     app.get('/', (req, res) => {
         res.send('LTTS Test Portal API is running!');
