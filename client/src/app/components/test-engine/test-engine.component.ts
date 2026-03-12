@@ -24,8 +24,12 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     testTitle = '';
     questions: any[] = [];
     answers: { [key: string]: number } = {};
-    questionTimes: { [key: string]: number } = {}; // seconds spent per question
+    questionTimes: { [key: string]: number } = {};
     questionStartTime: number = Date.now();
+
+    // ✅ ADD: loading and error states so template doesn't show blank silently
+    isLoading = true;
+    loadError = '';
 
     warnings = 0;
     tabSwitchCount = 0;
@@ -65,57 +69,82 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     loadAttemptAndQuestions() {
-        // First get the attempt to find testId and start time
+        this.isLoading = true;
+        this.loadError = '';
+
+        // Step 1: fetch the attempt to get testId and startTime
         this.http.get(`${this.apiUrl}/attempts/${this.attemptId}`).subscribe({
             next: (attempt: any) => {
-                this.testId = attempt.test?._id || attempt.test;
+
+                // ✅ FIX: handle both populated object and plain ObjectId string
+                this.testId = (attempt.test && typeof attempt.test === 'object')
+                    ? attempt.test._id
+                    : attempt.test;
+
+                if (!this.testId) {
+                    this.loadError = 'Could not determine test ID from attempt.';
+                    this.isLoading = false;
+                    return;
+                }
+
                 const startTime = new Date(attempt.startTime).getTime();
 
-                // Restore existing answers if any
-                if (attempt.answers && Array.isArray(attempt.answers)) {
-                    attempt.answers.forEach((ans: any) => {
-                        if (ans.timeSpent) {
-                            this.questionTimes[ans.questionId] = ans.timeSpent;
-                        }
-                    });
-                }
+                // Restore tab switch count
                 if (attempt.tabSwitchCount) {
                     this.tabSwitchCount = attempt.tabSwitchCount;
                     this.warnings = attempt.tabSwitchCount;
                 }
 
-                // Now load questions
+                // Step 2: fetch questions for this test
                 this.http.get(`${this.apiUrl}/tests/${this.testId}/questions`).subscribe({
                     next: (data: any) => {
-                        this.testTitle = data.title;
-                        this.questions = data.questions;
-                        this.timeLeft = Math.max(0, (data.duration * 60) - Math.floor((Date.now() - startTime) / 1000));
+                        this.testTitle = data.title || 'Assessment';
 
-                        // Restore existing answers
+                        // ✅ FIX: guard against null/undefined questions array
+                        this.questions = Array.isArray(data.questions) ? data.questions.filter((q: any) => q !== null) : [];
+
+                        if (this.questions.length === 0) {
+                            this.loadError = 'This test has no questions yet. Please contact your administrator.';
+                            this.isLoading = false;
+                            return;
+                        }
+
+                        // Calculate remaining time accounting for time already elapsed
+                        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                        this.timeLeft = Math.max(0, (data.duration * 60) - elapsedSeconds);
+
+                        // Restore previously saved answers
                         if (attempt.answers && Array.isArray(attempt.answers)) {
                             attempt.answers.forEach((ans: any) => {
-                                const q = this.questions.find(q => q._id === ans.questionId);
+                                const q = this.questions.find((q: any) => q._id === ans.questionId);
                                 if (q && q.options && ans.selectedOption) {
                                     const idx = q.options.indexOf(ans.selectedOption);
                                     if (idx !== -1) {
                                         this.answers[ans.questionId] = idx;
                                     }
                                 }
+                                // Restore time spent per question
+                                if (ans.timeSpent) {
+                                    this.questionTimes[ans.questionId] = ans.timeSpent;
+                                }
                             });
                         }
 
                         this.questionStartTime = Date.now();
+                        this.isLoading = false;
                         this.startTimer();
                     },
-                    error: () => {
-                        alert('Failed to load questions.');
-                        this.router.navigate(['/test', this.link]);
+                    error: (err: any) => {
+                        console.error('Failed to load questions:', err);
+                        this.loadError = 'Failed to load questions. Please try again.';
+                        this.isLoading = false;
                     }
                 });
             },
-            error: () => {
-                alert('Failed to load attempt.');
-                this.router.navigate(['/test', this.link]);
+            error: (err: any) => {
+                console.error('Failed to load attempt:', err);
+                this.loadError = 'Failed to load your session. Please start again.';
+                this.isLoading = false;
             }
         });
     }
@@ -174,15 +203,16 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     saveProgress() {
-        if (this.attemptId) {
-            this.trackQuestionTime();
-            const formattedAnswers = this.formatAnswers();
-            this.http.put(`${this.apiUrl}/attempts/${this.attemptId}/save`, {
-                answers: formattedAnswers,
-                tabSwitchCount: this.tabSwitchCount
-            }).subscribe();
-            this.questionStartTime = Date.now(); // Reset after save
-        }
+        if (!this.attemptId || this.questions.length === 0) return;
+        this.trackQuestionTime();
+        const formattedAnswers = this.formatAnswers();
+        this.http.put(`${this.apiUrl}/attempts/${this.attemptId}/save`, {
+            answers: formattedAnswers,
+            tabSwitchCount: this.tabSwitchCount
+        }).subscribe({
+            error: (err) => console.error('Auto-save failed:', err)
+        });
+        this.questionStartTime = Date.now();
     }
 
     private formatAnswers() {
