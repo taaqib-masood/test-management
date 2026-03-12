@@ -47,10 +47,12 @@ const startAttempt = async (req, res) => {
       });
     }
 
-    // Return attempt + populated questions
+    // ==============================
+    // Return attempt + questions embedded inside
+    // ==============================
     res.status(201).json({
-      attempt: existingAttempt,
-      questions: test.questions
+      ...existingAttempt.toObject(),  // Spread attempt fields
+      questions: test.questions       // Add questions array directly
     });
 
   } catch (error) {
