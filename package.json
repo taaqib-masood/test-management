@@ -1,17 +1,20 @@
 {
-    "name": "ltts-test-portal",
-    "version": "1.0.0",
-    "description": "Full-stack Test Portal for LTTS",
-    "scripts": {
-        "install-all": "npm install && cd client && npm install && cd ../server && npm install",
-        "dev": "concurrently \"npm run server\" \"npm run client\"",
-        "server": "cd server && npm run dev",
-        "client": "npm run start --prefix client",
-        "build": "cd client && npm install && npm run build",
-        "start": "node server/server.js"
-    },
-    "dependencies": {
-        "concurrently": "^8.2.2"
-    },
-    "devDependencies": {}
+  "name": "ltts-test-portal",
+  "version": "1.0.0",
+  "description": "Full-stack Test Portal for LTTS",
+  "scripts": {
+    "install-all": "npm install && cd client && npm install && cd ../server && npm install",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm run dev",
+    "client": "npm run start --prefix client",
+    "build": "cd client && npm install && npm run build",
+    "start": "node server/server.js"
+  },
+  "dependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": "22.x"
+  }
 }
