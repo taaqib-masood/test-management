@@ -1,6 +1,5 @@
 // ==============================
 // testController.js
-// Handles: all test + question management
 // ==============================
 
 const Test = require('../models/Test');
@@ -9,8 +8,9 @@ const Attempt = require('../models/Attempt');
 
 // ==================== ADMIN CONTROLLERS ==================== //
 
-// Upload questions via Excel file
+// Upload questions via Excel AND optionally link them to a test
 // POST /api/tests/upload-questions
+// Body (form-data): file, testId (optional)
 const uploadQuestions = async (req, res) => {
   try {
     if (!req.file) {
@@ -26,8 +26,6 @@ const uploadQuestions = async (req, res) => {
       return res.status(400).json({ message: 'Excel file is empty or unreadable' });
     }
 
-    // Map Excel columns to Question schema
-    // Expected columns: question, type, options, rect_answ, difficulty, category
     const questionsToInsert = rows.map((row, index) => {
       const text = row['question'] || row['Question'];
       const correctAnswer = row['rect_answ'] || row['correctAnswer'] || row['answer'];
@@ -37,7 +35,7 @@ const uploadQuestions = async (req, res) => {
         : [];
 
       if (!text || !correctAnswer) {
-        throw new Error(`Row ${index + 2}: Missing required fields "question" or "rect_answ"`);
+        throw new Error(`Row ${index + 2}: Missing "question" or "rect_answ"`);
       }
 
       return {
@@ -51,10 +49,34 @@ const uploadQuestions = async (req, res) => {
     });
 
     const questions = await Question.insertMany(questionsToInsert);
+    const questionIds = questions.map(q => q._id);
+
+    // ✅ KEY FIX: If testId is provided in form body, link questions to that test immediately
+    const { testId } = req.body;
+    if (testId) {
+      const test = await Test.findById(testId);
+      if (!test) {
+        return res.status(404).json({
+          message: 'Questions saved but test not found — link manually using /api/tests/:id/add-questions',
+          questionIds
+        });
+      }
+      const existingIds = test.questions.map(id => id.toString());
+      const newIds = questionIds.filter(id => !existingIds.includes(id.toString()));
+      test.questions.push(...newIds);
+      await test.save();
+
+      return res.status(201).json({
+        message: `${questions.length} questions uploaded and linked to "${test.title}"`,
+        count: questions.length,
+        testId: test._id
+      });
+    }
 
     res.status(201).json({
-      message: 'Questions uploaded successfully',
-      count: questions.length
+      message: `${questions.length} questions saved. Pass testId in the form body to auto-link them.`,
+      count: questions.length,
+      questionIds
     });
   } catch (error) {
     console.error('Upload Questions Error:', error);
@@ -62,17 +84,39 @@ const uploadQuestions = async (req, res) => {
   }
 };
 
-// Create questions manually (array)
+// Create questions manually
 // POST /api/tests/create-questions
+// Body: { questions: [...], testId: "..." (optional) }
 const createQuestions = async (req, res) => {
   try {
-    const { questions } = req.body;
+    const { questions, testId } = req.body;
 
     if (!questions || !Array.isArray(questions) || questions.length === 0) {
       return res.status(400).json({ message: 'A non-empty questions array is required' });
     }
 
     const createdQuestions = await Question.insertMany(questions);
+    const questionIds = createdQuestions.map(q => q._id);
+
+    if (testId) {
+      const test = await Test.findById(testId);
+      if (!test) {
+        return res.status(404).json({
+          message: 'Questions saved but test not found',
+          questionIds
+        });
+      }
+      const existingIds = test.questions.map(id => id.toString());
+      const newIds = questionIds.filter(id => !existingIds.includes(id.toString()));
+      test.questions.push(...newIds);
+      await test.save();
+
+      return res.status(201).json({
+        message: `${createdQuestions.length} questions created and linked to test`,
+        count: createdQuestions.length,
+        questions: createdQuestions
+      });
+    }
 
     res.status(201).json({
       message: 'Questions created successfully',
@@ -85,20 +129,47 @@ const createQuestions = async (req, res) => {
   }
 };
 
+// Link existing questions to a test by IDs
+// POST /api/tests/:id/add-questions
+// Body: { questionIds: ["id1", "id2", ...] }
+const addQuestionsToTest = async (req, res) => {
+  try {
+    const { questionIds } = req.body;
+
+    if (!questionIds || !Array.isArray(questionIds) || questionIds.length === 0) {
+      return res.status(400).json({ message: 'A non-empty questionIds array is required' });
+    }
+
+    const test = await Test.findById(req.params.id);
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    const existing = await Question.find({ _id: { $in: questionIds } });
+    if (existing.length !== questionIds.length) {
+      return res.status(400).json({ message: 'One or more question IDs not found' });
+    }
+
+    const existingIds = test.questions.map(id => id.toString());
+    const newIds = questionIds.filter(id => !existingIds.includes(id.toString()));
+    test.questions.push(...newIds);
+    await test.save();
+
+    res.json({
+      message: `${newIds.length} questions linked to test`,
+      totalQuestions: test.questions.length
+    });
+  } catch (error) {
+    console.error('Add Questions To Test Error:', error);
+    res.status(500).json({ message: 'Error linking questions to test' });
+  }
+};
+
 // Create a new Test
 // POST /api/tests
 const createTest = async (req, res) => {
   try {
     const {
-      title,
-      duration,
-      shuffleQuestions,
-      shuffleOptions,
-      questions,
-      accessCode,
-      expiryDate,
-      allowMultipleAttempts,
-      showResults
+      title, duration, shuffleQuestions, shuffleOptions,
+      questions, accessCode, expiryDate, allowMultipleAttempts, showResults
     } = req.body;
 
     if (!title || !duration) {
@@ -125,19 +196,52 @@ const createTest = async (req, res) => {
   }
 };
 
-// Get all Tests (admin)
+// Get all Tests (admin) — includes questionCount, attemptCount, avgScore per test
 // GET /api/tests
 const getTests = async (req, res) => {
   try {
     const tests = await Test.find().sort({ createdAt: -1 });
-    res.json(tests);
+
+    // Fetch attempt stats for all tests in one query
+    const testIds = tests.map(t => t._id);
+    const attempts = await Attempt.find({ test: { $in: testIds }, completed: true });
+
+    // Group attempts by testId
+    const attemptMap = {};
+    attempts.forEach(a => {
+      const key = a.test.toString();
+      if (!attemptMap[key]) attemptMap[key] = [];
+      attemptMap[key].push(a);
+    });
+
+    const testsWithStats = tests.map(t => {
+      const testAttempts = attemptMap[t._id.toString()] || [];
+      const attemptCount = testAttempts.length;
+      const avgScore = attemptCount > 0
+        ? parseFloat(
+            (testAttempts.reduce((sum, a) => {
+              return sum + (a.totalQuestions > 0 ? (a.score / a.totalQuestions) * 100 : 0);
+            }, 0) / attemptCount).toFixed(1)
+          )
+        : 0;
+
+      return {
+        ...t.toObject(),
+        questionCount:  t.questions ? t.questions.length : 0,
+        totalQuestions: t.questions ? t.questions.length : 0,
+        attemptCount,
+        avgScore
+      };
+    });
+
+    res.json(testsWithStats);
   } catch (error) {
     console.error('Get Tests Error:', error);
     res.status(500).json({ message: 'Error fetching tests' });
   }
 };
 
-// Get a single test by ID (admin, with questions)
+// Get a single test by ID with full questions (admin)
 // GET /api/tests/:id
 const getTest = async (req, res) => {
   try {
@@ -150,7 +254,7 @@ const getTest = async (req, res) => {
   }
 };
 
-// Get all questions in the Question collection (admin)
+// Get all questions from Question collection (admin)
 // GET /api/tests/questions/all
 const getAllQuestions = async (req, res) => {
   try {
@@ -192,14 +296,13 @@ const deleteTest = async (req, res) => {
   }
 };
 
-// Delete a single question from Question collection
+// Delete a single question + unlink from all tests
 // DELETE /api/tests/questions/:id
 const deleteQuestion = async (req, res) => {
   try {
     const question = await Question.findByIdAndDelete(req.params.id);
     if (!question) return res.status(404).json({ message: 'Question not found' });
 
-    // Also remove from any tests that reference it
     await Test.updateMany(
       { questions: req.params.id },
       { $pull: { questions: req.params.id } }
@@ -212,15 +315,12 @@ const deleteQuestion = async (req, res) => {
   }
 };
 
-// Delete ALL questions from Question collection
+// Delete ALL questions + clear from all tests
 // DELETE /api/tests/questions/all
 const deleteAllQuestions = async (req, res) => {
   try {
     await Question.deleteMany({});
-
-    // Also clear questions array from all tests
     await Test.updateMany({}, { $set: { questions: [] } });
-
     res.json({ message: 'All questions deleted successfully' });
   } catch (error) {
     console.error('Delete All Questions Error:', error);
@@ -231,23 +331,18 @@ const deleteAllQuestions = async (req, res) => {
 
 // ==================== PUBLIC ROUTES ==================== //
 
-// Get test info by unique shareable link (students)
+// Get test info by shareable link (students)
 // GET /api/tests/link/:uniqueLink
 const getTestByLink = async (req, res) => {
   try {
-    const test = await Test.findOne({
-      uniqueLink: req.params.uniqueLink,
-      isActive: true
-    });
-
+    const test = await Test.findOne({ uniqueLink: req.params.uniqueLink, isActive: true });
     if (!test) return res.status(404).json({ message: 'Test not found or inactive' });
 
-    // Return only safe fields (no correct answers)
     res.json({
       _id: test._id,
       title: test.title,
       duration: test.duration,
-      accessCode: test.accessCode ? true : false, // Just tell frontend if code is required
+      requiresAccessCode: !!test.accessCode,
       expiryDate: test.expiryDate,
       allowMultipleAttempts: test.allowMultipleAttempts,
       totalQuestions: test.questions ? test.questions.length : 0
@@ -258,7 +353,7 @@ const getTestByLink = async (req, res) => {
   }
 };
 
-// Get test questions for students (no correct answers)
+// Get test questions for students (NO correct answers)
 // GET /api/tests/:id/questions
 const getTestQuestions = async (req, res) => {
   try {
@@ -267,7 +362,18 @@ const getTestQuestions = async (req, res) => {
     if (!test) return res.status(404).json({ message: 'Test not found' });
     if (!test.isActive) return res.status(400).json({ message: 'Test is not active' });
 
-    let questions = (test.questions || []).filter(q => q !== null);
+    // ✅ Filter out stale null refs
+    let questions = (test.questions || []).filter(q => q !== null && q !== undefined);
+
+    if (questions.length === 0) {
+      return res.status(200).json({
+        testId: test._id,
+        title: test.title,
+        duration: test.duration,
+        questions: [],
+        warning: 'No questions have been linked to this test yet. Upload questions and include the testId.'
+      });
+    }
 
     if (test.shuffleQuestions) {
       questions = [...questions].sort(() => Math.random() - 0.5);
@@ -295,8 +401,8 @@ const getTestQuestions = async (req, res) => {
   }
 };
 
-// Start a test attempt (students)
-// POST /api/tests/attempt/start  (or use attemptRoutes — see note)
+// Start attempt (students)
+// POST /api/tests/attempt/start
 const startAttempt = async (req, res) => {
   try {
     const { testId, studentName, studentEmail, accessCode } = req.body;
@@ -320,11 +426,10 @@ const startAttempt = async (req, res) => {
       return res.status(401).json({ message: 'Invalid access code' });
     }
 
-    // Check for existing attempt
     const existingAttempt = await Attempt.findOne({ studentEmail: normalizedEmail, test: testId });
 
     if (existingAttempt && existingAttempt.completed && !test.allowMultipleAttempts) {
-      return res.status(400).json({ message: 'You have already completed this test. Only one attempt is allowed.' });
+      return res.status(400).json({ message: 'You have already completed this test.' });
     }
 
     if (!existingAttempt || (existingAttempt.completed && test.allowMultipleAttempts)) {
@@ -333,12 +438,12 @@ const startAttempt = async (req, res) => {
         studentEmail: normalizedEmail,
         test: testId,
         totalQuestions: test.questions ? test.questions.length : 0,
-        startTime: new Date()
+        startTime: new Date(),
+        completed: false
       });
       return res.status(201).json(attempt);
     }
 
-    // Return existing in-progress attempt
     res.json(existingAttempt);
   } catch (error) {
     console.error('Start Attempt Error:', error);
@@ -346,11 +451,11 @@ const startAttempt = async (req, res) => {
   }
 };
 
-// Submit a test attempt (students)
+// Submit attempt with grading
 // POST /api/tests/attempt/submit
 const submitAttempt = async (req, res) => {
   try {
-    const { attemptId, answers } = req.body;
+    const { attemptId, answers, tabSwitchCount } = req.body;
 
     if (!attemptId || !answers) {
       return res.status(400).json({ message: 'attemptId and answers are required' });
@@ -364,8 +469,7 @@ const submitAttempt = async (req, res) => {
     if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
     if (attempt.completed) return res.status(400).json({ message: 'Attempt already submitted' });
 
-    // Grade answers
-    const questions = attempt.test.questions || [];
+    const questions = (attempt.test && attempt.test.questions) ? attempt.test.questions : [];
     let score = 0;
 
     const gradedAnswers = answers.map(ans => {
@@ -377,9 +481,10 @@ const submitAttempt = async (req, res) => {
 
     attempt.answers = gradedAnswers;
     attempt.score = score;
-    attempt.completed = true;
+    attempt.completed = true;    // ✅ Stats query depends on this being true
     attempt.endTime = new Date();
-    attempt.timeTaken = Math.round((attempt.endTime - attempt.startTime) / 1000); // seconds
+    attempt.timeTaken = Math.round((new Date() - new Date(attempt.startTime)) / 1000);
+    attempt.tabSwitchCount = tabSwitchCount || 0;
     await attempt.save();
 
     res.json({
@@ -399,6 +504,7 @@ const submitAttempt = async (req, res) => {
 module.exports = {
   uploadQuestions,
   createQuestions,
+  addQuestionsToTest,
   createTest,
   getTests,
   getTest,
