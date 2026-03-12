@@ -21,27 +21,21 @@ app.use(express.urlencoded({ extended: true }));
 const connectDB = require('./config/db');
 connectDB();
 
+
 // Health Check Route
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+    res.status(200).json({
+        status: 'ok',
+        uptime: process.uptime()
+    });
 });
 
-// Simple Root Route
+
+// Root Route
 app.get('/', (req, res) => {
     res.send('LTTS Test Portal API is running!');
 });
 
-// --- Add login route for frontend ---
-app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
-
-    if(email === 'admin@ltts.com' && password === 'admin123') {
-        return res.json({ success: true, token: 'dummy-token' });
-    } else {
-        return res.status(401).json({ success: false, message: 'Invalid email/password' });
-    }
-});
-// --- End of login route ---
 
 // API Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -49,7 +43,27 @@ app.use('/api/tests', require('./routes/testRoutes'));
 app.use('/api/attempts', require('./routes/attemptRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 
+
+// GLOBAL ERROR HANDLER (IMPORTANT)
+app.use((err, req, res, next) => {
+
+    console.error(err.stack);
+
+    // Mongoose validation error
+    if (err.name === 'ValidationError') {
+        return res.status(400).json({
+            message: 'Only LTTS email IDs are allowed'
+        });
+    }
+
+    res.status(500).json({
+        message: 'Server error'
+    });
+
+});
+
+
 // Start Server
 app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+    console.log(`🚀 Server running on port ${PORT}`);
 });
