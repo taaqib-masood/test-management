@@ -1,80 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-
 const { protect, admin } = require('../middleware/authMiddleware');
+const testController = require('../controllers/testController');
 
-const {
-  uploadQuestions,
-  createQuestions,
-  createTest,
-  getTest,
-  getTests,
-  getTestByLink,
-  getTestQuestions,
-  getAllQuestions,
-  toggleTest,
-  deleteTest,
-  deleteQuestion,
-  deleteAllQuestions
-} = require('../controllers/testController');
-
-
-// File upload setup
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-
-// =============================
+// ---------------------
 // ADMIN ROUTES
-// =============================
+// ---------------------
+router.post('/upload-questions', protect, admin, upload.single('file'), testController.uploadQuestions);
+router.post('/create-questions', protect, admin, testController.createQuestions);
+router.post('/', protect, admin, testController.createTest);
+router.get('/', protect, admin, testController.getTests);
+router.get('/questions/all', protect, admin, testController.getAllQuestions);
+router.delete('/questions/all', protect, admin, testController.deleteAllQuestions);
+router.delete('/questions/:id', protect, admin, testController.deleteQuestion);
+router.put('/:id/toggle', protect, admin, testController.toggleTest);
+router.delete('/:id', protect, admin, testController.deleteTest);
 
-// Upload questions via Excel/CSV
-router.post(
-  '/upload-questions',
-  protect,
-  admin,
-  upload.single('file'),
-  uploadQuestions
-);
-
-// Create questions manually
-router.post('/create-questions', protect, admin, createQuestions);
-
-// Create test
-router.post('/', protect, admin, createTest);
-
-// Get all tests
-router.get('/', protect, admin, getTests);
-
-// Get all questions
-router.get('/questions/all', protect, admin, getAllQuestions);
-
-// Delete all questions
-router.delete('/questions/all', protect, admin, deleteAllQuestions);
-
-// Delete single question
-router.delete('/questions/:id', protect, admin, deleteQuestion);
-
-// Toggle test active/inactive
-router.put('/:id/toggle', protect, admin, toggleTest);
-
-// Delete test
-router.delete('/:id', protect, admin, deleteTest);
-
-// Get single test (admin)
-router.get('/:id', protect, admin, getTest);
-
-
-// =============================
-// PUBLIC ROUTES (Students)
-// =============================
-
-// Get test using shareable link
-router.get('/link/:uniqueLink', getTestByLink);
-
-// Get questions for test
-router.get('/:id/questions', getTestQuestions);
-
+// ---------------------
+// PUBLIC ROUTES
+// ---------------------
+router.get('/link/:uniqueLink', testController.getTestByLink);
+router.get('/:id/questions', testController.getTestQuestions); // IMPORTANT: comes before /:id
+router.get('/:id', protect, admin, testController.getTest);
 
 module.exports = router;
