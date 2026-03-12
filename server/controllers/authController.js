@@ -37,12 +37,19 @@ const loginUser = async (req, res) => {
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
-// @access  Public (should be restricted in production)
+// @access  Public
 const registerUser = async (req, res) => {
 
     try {
 
         const { name, email, password, role } = req.body;
+
+        // 🔒 Restrict email domain BEFORE DB call
+        if (!email || !email.endsWith('@ltts.com')) {
+            return res.status(400).json({
+                message: 'Only LTTS email IDs are allowed'
+            });
+        }
 
         const userExists = await User.findOne({ email });
 
@@ -57,27 +64,24 @@ const registerUser = async (req, res) => {
             role
         });
 
-        if (user) {
-            res.status(201).json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                token: generateToken(user._id)
-            });
-        } else {
-            res.status(400).json({ message: 'Invalid user data' });
-        }
+        res.status(201).json({
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            token: generateToken(user._id)
+        });
 
     } catch (error) {
 
-        // Handle LTTS email validation error
+        // Backup validation from mongoose schema
         if (error.name === 'ValidationError') {
             return res.status(400).json({
                 message: 'Only LTTS email IDs are allowed'
             });
         }
 
+        console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 };
