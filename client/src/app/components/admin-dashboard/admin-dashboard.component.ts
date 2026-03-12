@@ -11,13 +11,17 @@ import { AuthService } from '../../services/auth.service';
     templateUrl: './admin-dashboard.component.html'
 })
 export class AdminDashboardComponent implements OnInit {
+
+    // ✅ FIX: initialise every field the template uses so nothing is undefined on first render
     stats: any = {
         totalTests: 0,
         uniqueStudents: 0,
+        totalAttempts: 0,
         avgScore: 0,
         totalQuestions: 0,
         recentAttempts: []
     };
+
     tests: any[] = [];
     isLoading = true;
     copiedLink = '';
@@ -31,21 +35,39 @@ export class AdminDashboardComponent implements OnInit {
 
     loadStats() {
         this.api.get('admin/stats').subscribe({
-            next: (data) => {
-                this.stats = data;
+            next: (data: any) => {
+                // ✅ FIX: merge so missing fields fall back to 0 instead of undefined
+                this.stats = {
+                    totalTests:     data.totalTests     ?? 0,
+                    uniqueStudents: data.uniqueStudents ?? 0,
+                    totalAttempts:  data.totalAttempts  ?? 0,
+                    avgScore:       data.avgScore       ?? 0,
+                    totalQuestions: data.totalQuestions ?? 0,
+                    recentAttempts: data.recentAttempts ?? []
+                };
             },
-            error: (err) => console.error(err)
+            error: (err: any) => {
+                console.error('Stats load error:', err);
+                // Leave defaults in place — don't crash
+            }
         });
     }
 
     loadTests() {
         this.api.get('tests').subscribe({
-            next: (data) => {
-                this.tests = data;
+            next: (data: any[]) => {
+                // ✅ FIX: backend returns questionCount — map it to totalQuestions for the template
+                // Also default attemptCount/avgScore so template conditionals don't break
+                this.tests = (data || []).map(t => ({
+                    ...t,
+                    totalQuestions: t.questionCount ?? (t.questions?.length ?? 0),
+                    attemptCount:   t.attemptCount  ?? 0,
+                    avgScore:       t.avgScore      ?? 0
+                }));
                 this.isLoading = false;
             },
-            error: (err) => {
-                console.error(err);
+            error: (err: any) => {
+                console.error('Tests load error:', err);
                 this.isLoading = false;
             }
         });
@@ -69,7 +91,7 @@ export class AdminDashboardComponent implements OnInit {
             this.api.delete(`tests/${test._id}`).subscribe({
                 next: () => {
                     this.tests = this.tests.filter(t => t._id !== test._id);
-                    this.loadStats(); // Refresh stats
+                    this.loadStats();
                 },
                 error: () => alert('Failed to delete test')
             });
