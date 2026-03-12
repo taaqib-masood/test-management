@@ -1,58 +1,62 @@
-const mongoose = require("mongoose");
-
-const questionSchema = new mongoose.Schema({
-    questionText: {
-        type: String,
-        required: true
-    },
-    options: [String],
-    correctAnswer: Number
-});
-
+const mongoose = require('mongoose');
 
 const testSchema = new mongoose.Schema({
-
     title: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
-
     duration: {
         type: Number,
-        required: true
+        required: true  // in minutes
     },
-
-    totalQuestions: {
-        type: Number,
-        required: true
-    },
-
+    // ✅ FIX: questions must be ObjectId refs to Question model, NOT embedded subdocuments
+    // Embedded subdocs can't be populated and break the entire question-loading flow
+    questions: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Question'
+    }],
     accessCode: {
-        type: String
+        type: String,
+        default: null
     },
-
     showResults: {
-        type: Boolean,
-        default: false
-    },
-
-    allowMultipleAttempts: {
         type: Boolean,
         default: true
     },
-
-    expiryDate: {
-        type: Date
+    allowMultipleAttempts: {
+        type: Boolean,
+        default: false
     },
-
+    expiryDate: {
+        type: Date,
+        default: null
+    },
     isActive: {
         type: Boolean,
         default: true
     },
-
-    questions: [questionSchema]
-
+    shuffleQuestions: {
+        type: Boolean,
+        default: false
+    },
+    shuffleOptions: {
+        type: Boolean,
+        default: false
+    },
+    uniqueLink: {
+        type: String,
+        unique: true,
+        sparse: true  // allows null without unique conflict
+    }
 }, { timestamps: true });
 
+// Auto-generate uniqueLink before saving if not set
+testSchema.pre('save', function (next) {
+    if (!this.uniqueLink) {
+        this.uniqueLink = Math.random().toString(36).substring(2, 10);
+    }
+    next();
+});
 
-module.exports = mongoose.model("Test", testSchema);
+module.exports = mongoose.model('Test', testSchema);
