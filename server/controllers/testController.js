@@ -2,25 +2,20 @@ const Test = require('../models/Test');
 const Attempt = require('../models/Attempt');
 
 
-// ============================
-// ADMIN PLACEHOLDER FUNCTIONS
-// ============================
-
-const uploadQuestions = async (req,res)=>{res.json({message:"uploadQuestions not implemented yet"})}
-const createQuestions = async (req,res)=>{res.json({message:"createQuestions not implemented yet"})}
-const createTest = async (req,res)=>{res.json({message:"createTest not implemented yet"})}
-const getTest = async (req,res)=>{res.json({message:"getTest not implemented yet"})}
-const getTests = async (req,res)=>{res.json({message:"getTests not implemented yet"})}
-const getAllQuestions = async (req,res)=>{res.json({message:"getAllQuestions not implemented yet"})}
-const toggleTest = async (req,res)=>{res.json({message:"toggleTest not implemented yet"})}
-const deleteTest = async (req,res)=>{res.json({message:"deleteTest not implemented yet"})}
-const deleteQuestion = async (req,res)=>{res.json({message:"deleteQuestion not implemented yet"})}
-const deleteAllQuestions = async (req,res)=>{res.json({message:"deleteAllQuestions not implemented yet"})}
+// Placeholder admin functions
+const uploadQuestions = async (req,res)=>res.json({message:"Not implemented"});
+const createQuestions = async (req,res)=>res.json({message:"Not implemented"});
+const createTest = async (req,res)=>res.json({message:"Not implemented"});
+const getTest = async (req,res)=>res.json({message:"Not implemented"});
+const getTests = async (req,res)=>res.json({message:"Not implemented"});
+const getAllQuestions = async (req,res)=>res.json({message:"Not implemented"});
+const toggleTest = async (req,res)=>res.json({message:"Not implemented"});
+const deleteTest = async (req,res)=>res.json({message:"Not implemented"});
+const deleteQuestion = async (req,res)=>res.json({message:"Not implemented"});
+const deleteAllQuestions = async (req,res)=>res.json({message:"Not implemented"});
 
 
-// ============================
-// PUBLIC FUNCTIONS
-// ============================
+// PUBLIC ROUTES
 
 const getTestByLink = async (req, res) => {
   try {
@@ -41,7 +36,6 @@ const getTestByLink = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 
 const getTestQuestions = async (req, res) => {
@@ -86,7 +80,6 @@ const getTestQuestions = async (req, res) => {
 };
 
 
-
 const startAttempt = async (req, res) => {
   try {
 
@@ -106,7 +99,6 @@ const startAttempt = async (req, res) => {
     res.status(500).json({ message: 'Error starting attempt' });
   }
 };
-
 
 
 const submitAttempt = async (req, res) => {
@@ -133,11 +125,6 @@ const submitAttempt = async (req, res) => {
   }
 };
 
-
-
-// ============================
-// EXPORTS
-// ============================
 
 module.exports = {
   uploadQuestions,
