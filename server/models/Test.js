@@ -1,40 +1,70 @@
-const mongoose = require('mongoose');
+const mongoose = require("mongoose");
+
+const questionSchema = new mongoose.Schema({
+    questionText: {
+        type: String,
+        required: true
+    },
+
+    options: [
+        {
+            type: String,
+            required: true
+        }
+    ],
+
+    correctAnswer: {
+        type: Number,
+        required: true
+    }
+});
+
+
 
 const testSchema = new mongoose.Schema({
-    title: { type: String, required: true },
 
-    duration: { type: Number, required: true },
-
-    totalQuestions: { type: Number, required: true },
-
-    accessCode: { type: String },
-
-    showResults: { type: Boolean, default: false },
-
-    allowMultipleAttempts: { type: Boolean, default: true },
-
-    expiryDate: { type: Date, default: null },
-
-    uniqueLink: {
+    title: {
         type: String,
-        unique: true,
-        default: () => Math.random().toString(36).substring(2,10)
+        required: true
     },
 
-    questions: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Question'
-    }],
-
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
+    duration: {
+        type: Number,
+        required: true
     },
 
-    shuffleQuestions: { type: Boolean, default: false },
+    totalQuestions: {
+        type: Number,
+        required: true
+    },
 
-    shuffleOptions: { type: Boolean, default: false },
+    accessCode: {
+        type: String
+    },
 
+    showResults: {
+        type: Boolean,
+        default: false
+    },
+
+    allowMultipleAttempts: {
+        type: Boolean,
+        default: true
+    },
+
+    expiryDate: {
+        type: Date,
+        default: null
+    },
+
+    questions: [questionSchema]
+
+}, {
+    timestamps: true
+});
+
+
+module.exports = mongoose.model("Test", testSchema);
     isActive: { type: Boolean, default: true },
 
     createdAt: { type: Date, default: Date.now }
