@@ -5,18 +5,8 @@ const questionSchema = new mongoose.Schema({
         type: String,
         required: true
     },
-
-    options: [
-        {
-            type: String,
-            required: true
-        }
-    ],
-
-    correctAnswer: {
-        type: Number,
-        required: true
-    }
+    options: [String],
+    correctAnswer: Number
 });
 
 
@@ -38,8 +28,7 @@ const testSchema = new mongoose.Schema({
     },
 
     accessCode: {
-        type: String,
-        default: null
+        type: String
     },
 
     showResults: {
@@ -53,8 +42,7 @@ const testSchema = new mongoose.Schema({
     },
 
     expiryDate: {
-        type: Date,
-        default: null
+        type: Date
     },
 
     isActive: {
@@ -64,9 +52,7 @@ const testSchema = new mongoose.Schema({
 
     questions: [questionSchema]
 
-}, {
-    timestamps: true
-});
+}, { timestamps: true });
 
 
 module.exports = mongoose.model("Test", testSchema);
