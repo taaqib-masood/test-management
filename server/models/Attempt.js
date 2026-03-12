@@ -3,11 +3,14 @@ const mongoose = require('mongoose');
 const attemptSchema = new mongoose.Schema({
     studentName: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     studentEmail: {
         type: String,
-        required: true
+        required: true,
+        lowercase: true,
+        trim: true
     },
     test: {
         type: mongoose.Schema.Types.ObjectId,
@@ -34,7 +37,7 @@ const attemptSchema = new mongoose.Schema({
             type: Boolean
         },
         timeSpent: {
-            type: Number, // seconds spent on this question
+            type: Number,
             default: 0
         }
     }],
@@ -54,8 +57,8 @@ const attemptSchema = new mongoose.Schema({
         default: false
     },
     timeTaken: {
-        type: Number // total seconds
+        type: Number  // total seconds
     }
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model('Attempt', attemptSchema);
