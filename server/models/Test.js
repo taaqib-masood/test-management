@@ -20,7 +20,6 @@ const questionSchema = new mongoose.Schema({
 });
 
 
-
 const testSchema = new mongoose.Schema({
 
     title: {
@@ -39,7 +38,8 @@ const testSchema = new mongoose.Schema({
     },
 
     accessCode: {
-        type: String
+        type: String,
+        default: null
     },
 
     showResults: {
@@ -57,6 +57,11 @@ const testSchema = new mongoose.Schema({
         default: null
     },
 
+    isActive: {
+        type: Boolean,
+        default: true
+    },
+
     questions: [questionSchema]
 
 }, {
@@ -65,33 +70,3 @@ const testSchema = new mongoose.Schema({
 
 
 module.exports = mongoose.model("Test", testSchema);
-    isActive: { type: Boolean, default: true },
-
-    createdAt: { type: Date, default: Date.now }
-});
-
-module.exports = mongoose.model('Test', testSchema);        ref: 'Question'
-    }],
-    createdBy: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    },
-    shuffleQuestions: {
-        type: Boolean,
-        default: false
-    },
-    shuffleOptions: {
-        type: Boolean,
-        default: false
-    },
-    isActive: {
-        type: Boolean,
-        default: true
-    },
-    createdAt: {
-        type: Date,
-        default: Date.now
-    }
-});
-
-module.exports = mongoose.model('Test', testSchema);
