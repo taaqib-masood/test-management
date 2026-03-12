@@ -1,5 +1,9 @@
-const Test = require('../models/testModel');
-const Attempt = require('../models/attemptModel');
+// ==============================
+// attemptController.js (Render-ready)
+// ==============================
+
+const Test = require('../models/Test');        // Match your file name exactly
+const Attempt = require('../models/Attempt');  // Match your file name exactly
 
 // ==============================
 // Public Controllers (Students)
@@ -70,8 +74,9 @@ const startAttempt = async (req, res) => {
     });
 
     res.status(201).json(newAttempt);
+
   } catch (error) {
-    console.error(error);
+    console.error('Error in startAttempt:', error);
     res.status(500).json({ message: 'Error starting attempt' });
   }
 };
@@ -84,6 +89,7 @@ const saveProgress = async (req, res) => {
   try {
     res.status(200).json({ message: 'saveProgress not implemented yet' });
   } catch (error) {
+    console.error('Error in saveProgress:', error);
     res.status(500).json({ message: 'Error saving progress' });
   }
 };
@@ -92,6 +98,7 @@ const submitAttempt = async (req, res) => {
   try {
     res.status(200).json({ message: 'submitAttempt not implemented yet' });
   } catch (error) {
+    console.error('Error in submitAttempt:', error);
     res.status(500).json({ message: 'Error submitting attempt' });
   }
 };
@@ -100,6 +107,7 @@ const getAttempt = async (req, res) => {
   try {
     res.status(200).json({ message: 'getAttempt not implemented yet' });
   } catch (error) {
+    console.error('Error in getAttempt:', error);
     res.status(500).json({ message: 'Error fetching attempt' });
   }
 };
@@ -108,6 +116,7 @@ const getAttemptsForTest = async (req, res) => {
   try {
     res.status(200).json({ message: 'getAttemptsForTest not implemented yet' });
   } catch (error) {
+    console.error('Error in getAttemptsForTest:', error);
     res.status(500).json({ message: 'Error fetching attempts for test' });
   }
 };
