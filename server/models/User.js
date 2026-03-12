@@ -1,16 +1,22 @@
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
+
+// ✅ FIX: Removed the pre('save') bcrypt hook entirely.
+// authController.js manually hashes the password before calling User.create().
+// Having BOTH the manual hash AND the hook means the password gets hashed twice,
+// making every login attempt fail because bcrypt.compare() never matches.
 
 const userSchema = new mongoose.Schema({
     name: {
         type: String,
-        required: true
+        required: true,
+        trim: true
     },
     email: {
         type: String,
         required: true,
         unique: true,
         lowercase: true,
+        trim: true,
         match: [
             /^\w+([\.-]?\w+)*@ltts\.com$/,
             'Please use a valid @ltts.com email address'
@@ -23,7 +29,7 @@ const userSchema = new mongoose.Schema({
     role: {
         type: String,
         enum: ['admin', 'student'],
-        default: 'student'
+        default: 'admin'   // portal is admin-only so default to admin
     },
     createdAt: {
         type: Date,
@@ -31,18 +37,9 @@ const userSchema = new mongoose.Schema({
     }
 });
 
-// Encrypt password using bcrypt
-userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) {
-        return next();
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    this.password = await bcrypt.hash(this.password, salt);
-});
-
-// Match user entered password to hashed password in database
+// Helper method — used by authController to verify login
 userSchema.methods.matchPassword = async function (enteredPassword) {
+    const bcrypt = require('bcryptjs');
     return await bcrypt.compare(enteredPassword, this.password);
 };
 
