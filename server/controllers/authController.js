@@ -132,7 +132,7 @@ const registerUser = async (req, res) => {
 module.exports = {
     loginUser,
     registerUser
-};};
+};
 
 
 // @desc    Register a new user
