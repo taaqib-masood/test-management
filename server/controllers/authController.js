@@ -1,217 +1,119 @@
-const Test = require('../models/Test');
-const Question = require('../models/Question'); // make sure you have a Question model
-const Attempt = require('../models/Attempt');
+// ==============================
+// authController.js
+// Handles: register, login only
+// ==============================
 
-// ---------------------
-// Admin Functions
-// ---------------------
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
-// Upload questions via Excel/CSV (requires parsing logic)
-const uploadQuestions = async (req, res) => {
+// ==============================
+// Register Admin
+// POST /api/auth/register
+// ==============================
+const registerUser = async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    const { name, email, password } = req.body;
 
-    // Parse Excel/CSV file here and insert into DB
-    // For example, using 'xlsx' package
-    const xlsx = require('xlsx');
-    const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
-    const sheetName = workbook.SheetNames[0];
-    const data = xlsx.utils.sheet_to_json(workbook.Sheets[sheetName]);
-
-    const questions = await Question.insertMany(data);
-
-    res.status(201).json({ message: 'Questions uploaded successfully', count: questions.length });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error uploading questions' });
-  }
-};
-
-// Create questions manually
-const createQuestions = async (req, res) => {
-  try {
-    const { questions } = req.body;
-    if (!questions || !Array.isArray(questions)) {
-      return res.status(400).json({ message: 'Questions array is required' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
     }
 
-    const createdQuestions = await Question.insertMany(questions);
+    // Only LTTS emails allowed
+    const normalizedEmail = email.toLowerCase().trim();
+    if (!normalizedEmail.endsWith('@ltts.com')) {
+      return res.status(400).json({ message: 'Only LTTS email IDs are allowed' });
+    }
 
-    res.status(201).json({ message: 'Questions created', questions: createdQuestions });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error creating questions' });
-  }
-};
+    // Check if user already exists
+    const existingUser = await User.findOne({ email: normalizedEmail });
+    if (existingUser) {
+      return res.status(400).json({ message: 'User already exists with this email' });
+    }
 
-// Create a test
-const createTest = async (req, res) => {
-  try {
-    const { title, duration, questions, shuffleQuestions, shuffleOptions } = req.body;
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    const test = await Test.create({
-      title,
-      duration,
-      questions,
-      shuffleQuestions: shuffleQuestions || false,
-      shuffleOptions: shuffleOptions || false,
-      isActive: true,
+    // Create user
+    const user = await User.create({
+      name: name.trim(),
+      email: normalizedEmail,
+      password: hashedPassword,
+      role: 'admin'
     });
 
-    res.status(201).json({ message: 'Test created', test });
+    // Generate token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.status(201).json({
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error creating test' });
+    console.error('Register Error:', error);
+    res.status(500).json({ message: 'Error registering user' });
   }
 };
 
-// Get a single test (admin)
-const getTest = async (req, res) => {
+// ==============================
+// Login Admin
+// POST /api/auth/login
+// ==============================
+const loginUser = async (req, res) => {
   try {
-    const test = await Test.findById(req.params.id).populate('questions');
-    if (!test) return res.status(404).json({ message: 'Test not found' });
+    const { email, password } = req.body;
 
-    res.json(test);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching test' });
-  }
-};
-
-// Get all tests (admin)
-const getTests = async (req, res) => {
-  try {
-    const tests = await Test.find().populate('questions');
-    res.json(tests);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching tests' });
-  }
-};
-
-// Get all questions (admin)
-const getAllQuestions = async (req, res) => {
-  try {
-    const questions = await Question.find();
-    res.json(questions);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching questions' });
-  }
-};
-
-// Toggle test active/inactive
-const toggleTest = async (req, res) => {
-  try {
-    const test = await Test.findById(req.params.id);
-    if (!test) return res.status(404).json({ message: 'Test not found' });
-
-    test.isActive = !test.isActive;
-    await test.save();
-
-    res.json({ message: `Test is now ${test.isActive ? 'active' : 'inactive'}`, test });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error toggling test' });
-  }
-};
-
-// Delete test
-const deleteTest = async (req, res) => {
-  try {
-    const test = await Test.findByIdAndDelete(req.params.id);
-    if (!test) return res.status(404).json({ message: 'Test not found' });
-
-    res.json({ message: 'Test deleted' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error deleting test' });
-  }
-};
-
-// Delete single question
-const deleteQuestion = async (req, res) => {
-  try {
-    const question = await Question.findByIdAndDelete(req.params.id);
-    if (!question) return res.status(404).json({ message: 'Question not found' });
-
-    res.json({ message: 'Question deleted' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error deleting question' });
-  }
-};
-
-// Delete all questions
-const deleteAllQuestions = async (req, res) => {
-  try {
-    await Question.deleteMany();
-    res.json({ message: 'All questions deleted' });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error deleting questions' });
-  }
-};
-
-// ---------------------
-// Public Routes
-// ---------------------
-
-const getTestByLink = async (req, res) => {
-  try {
-    const test = await Test.findOne({ uniqueLink: req.params.uniqueLink, isActive: true }).populate('questions');
-    if (!test) return res.status(404).json({ message: 'Test not found or inactive' });
-    res.json(test);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-const getTestQuestions = async (req, res) => {
-  try {
-    const test = await Test.findById(req.params.id).populate('questions', '-correctAnswer');
-    if (!test) return res.status(404).json({ message: 'Test not found' });
-
-    let questions = (test.questions || []).filter(q => q !== null);
-
-    if (test.shuffleQuestions) {
-      questions = [...questions].sort(() => Math.random() - 0.5);
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
     }
 
-    if (test.shuffleOptions) {
-      questions = questions.map(q => {
-        const qObj = q.toObject();
-        if (qObj.options && Array.isArray(qObj.options)) {
-          qObj.options = [...qObj.options].sort(() => Math.random() - 0.5);
-        }
-        return qObj;
-      });
+    const normalizedEmail = email.toLowerCase().trim();
+
+    // Find user
+    const user = await User.findOne({ email: normalizedEmail });
+    if (!user) {
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
+
+    // Check password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid email or password' });
+    }
+
+    // Generate token
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
-      testId: test._id,
-      title: test.title,
-      duration: test.duration,
-      questions,
+      token,
+      user: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error fetching questions' });
+    console.error('Login Error:', error);
+    res.status(500).json({ message: 'Error logging in' });
   }
 };
 
 module.exports = {
-  uploadQuestions,
-  createQuestions,
-  createTest,
-  getTest,
-  getTests,
-  getTestByLink,
-  getTestQuestions,
-  getAllQuestions,
-  toggleTest,
-  deleteTest,
-  deleteQuestion,
-  deleteAllQuestions,
+  registerUser,
+  loginUser
 };
