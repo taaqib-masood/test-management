@@ -38,11 +38,12 @@ const uploadQuestions = async (req, res) => {
         throw new Error(`Row ${index + 2}: Missing "question" or "rect_answ"`);
       }
 
+      // ✅ FIX: Excel may return numbers instead of strings — convert before calling .trim()
       return {
-        text: text.trim(),
+        text: String(text).trim(),
         type: row['type'] || 'MCQ',
         options,
-        correctAnswer: correctAnswer.trim(),
+        correctAnswer: String(correctAnswer).trim(),
         difficulty: row['difficulty'] || 'medium',
         category: row['category'] || 'General'
       };
