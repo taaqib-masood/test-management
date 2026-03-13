@@ -13,12 +13,11 @@ export class AuthService {
     public currentUser$ = this.currentUserSubject.asObservable();
 
     constructor(private http: HttpClient, private router: Router) {
-        const user = localStorage.getItem('user');
-        if (user) {
+        const stored = localStorage.getItem('user');
+        if (stored) {
             try {
-                this.currentUserSubject.next(JSON.parse(user));
+                this.currentUserSubject.next(JSON.parse(stored));
             } catch (e) {
-                console.error('Failed to parse user from local storage', e);
                 localStorage.removeItem('user');
             }
         }
@@ -26,18 +25,18 @@ export class AuthService {
 
     login(credentials: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/login`, credentials).pipe(
-            tap((user: any) => {
-                localStorage.setItem('user', JSON.stringify(user));
-                this.currentUserSubject.next(user);
+            tap((response: any) => {
+                localStorage.setItem('user', JSON.stringify(response));
+                this.currentUserSubject.next(response);
             })
         );
     }
 
     register(data: any): Observable<any> {
         return this.http.post(`${this.apiUrl}/register`, data).pipe(
-            tap((user: any) => {
-                localStorage.setItem('user', JSON.stringify(user));
-                this.currentUserSubject.next(user);
+            tap((response: any) => {
+                localStorage.setItem('user', JSON.stringify(response));
+                this.currentUserSubject.next(response);
             })
         );
     }
@@ -48,12 +47,22 @@ export class AuthService {
         this.router.navigate(['/login']);
     }
 
+    // ✅ FIX: backend returns { token, user: { role, name, email } }
+    // token is at the top level, user details are nested under .user
     getToken(): string | null {
-        const user = this.currentUserSubject.value;
-        return user ? user.token : null;
+        const response = this.currentUserSubject.value;
+        return response?.token || null;
     }
 
+    // ✅ FIX: return the nested user object so role/name/email are accessible directly
     getUser(): any {
-        return this.currentUserSubject.value;
+        const response = this.currentUserSubject.value;
+        if (!response) return null;
+        // If already flattened (old format), return as-is
+        // If nested (new format { token, user: {...} }), return the inner user with token attached
+        if (response.user) {
+            return { ...response.user, token: response.token };
+        }
+        return response;
     }
 }
