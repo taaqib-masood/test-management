@@ -18,9 +18,10 @@ export class LoginComponent {
     isLoading = false;
 
     constructor(private authService: AuthService, private router: Router) {
-        // If already logged in, redirect to admin
         const user = this.authService.getUser();
-        if (user && user.role === 'admin') {
+        // ✅ FIX: role is nested inside user.user.role because backend returns { token, user: {...} }
+        const role = user?.user?.role || user?.role;
+        if (user && role === 'admin') {
             this.router.navigate(['/admin']);
         }
     }
@@ -30,16 +31,19 @@ export class LoginComponent {
         this.isLoading = true;
 
         this.authService.login({ email: this.email, password: this.password }).subscribe({
-            next: (user) => {
+            next: (response: any) => {
                 this.isLoading = false;
-                if (user.role === 'admin') {
+                // ✅ FIX: backend returns { token, user: { role, name, email } }
+                // so role is at response.user.role, not response.role
+                const role = response?.user?.role || response?.role;
+                if (role === 'admin') {
                     this.router.navigate(['/admin']);
                 } else {
                     this.error = 'Only admin accounts can log in here.';
                     this.authService.logout();
                 }
             },
-            error: (err) => {
+            error: (err: any) => {
                 this.isLoading = false;
                 this.error = err.error?.message || 'Invalid credentials';
             }
