@@ -26,13 +26,11 @@ export class CreateTestComponent implements OnInit {
         selectedQuestions: [] as string[]
     };
 
-    // Difficulty distribution
     difficultyMode: 'manual' | 'auto' = 'auto';
     easyPercent = 30;
     mediumPercent = 40;
     hardPercent = 30;
 
-    // Category filter
     selectedCategory = '';
     categories: string[] = [];
 
@@ -41,8 +39,8 @@ export class CreateTestComponent implements OnInit {
     filteredQuestions: any[] = [];
     questionsLoading = true;
     createdLink = '';
+    createError = '';
 
-    // Stats
     easyCount = 0;
     mediumCount = 0;
     hardCount = 0;
@@ -87,7 +85,6 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
-    // Auto-select questions based on difficulty percentages
     autoSelectQuestions() {
         const total = this.test.totalQuestions;
         const easyNeeded = Math.round((this.easyPercent / 100) * total);
@@ -107,7 +104,6 @@ export class CreateTestComponent implements OnInit {
         selected.push(...mediumPool.slice(0, mediumNeeded).map((q: any) => q._id));
         selected.push(...hardPool.slice(0, hardNeeded).map((q: any) => q._id));
 
-        // If we couldn't fill from exact difficulties, fill remaining from any pool
         if (selected.length < total) {
             const remaining = pool.filter((q: any) => !selected.includes(q._id));
             const needed = total - selected.length;
@@ -126,7 +122,6 @@ export class CreateTestComponent implements OnInit {
         return a;
     }
 
-    // Ensure percentages add up to 100
     adjustPercent(changed: 'easy' | 'medium' | 'hard') {
         const total = this.easyPercent + this.mediumPercent + this.hardPercent;
         if (total !== 100) {
@@ -176,27 +171,49 @@ export class CreateTestComponent implements OnInit {
     }
 
     onSubmit() {
+        if (!this.test.title.trim()) {
+            alert('Please enter a test title');
+            return;
+        }
         if (this.test.selectedQuestions.length === 0) {
             alert('Please select at least one question');
             return;
         }
-        this.isLoading = true;
 
+        this.isLoading = true;
+        this.createError = '';
+
+        // ✅ FIX: Send ONLY the fields the backend schema expects.
+        // Do NOT spread this.test — it contains UI-only fields like
+        // selectedQuestions, useAccessCode, useExpiry that break the backend.
         const payload = {
-            ...this.test,
-            totalQuestions: this.test.selectedQuestions.length,
-            accessCode: this.test.useAccessCode ? this.test.accessCode : '',
-            expiryDate: this.test.useExpiry ? this.test.expiryDate : null
+            title: this.test.title.trim(),
+            duration: this.test.duration,
+            shuffleQuestions: this.test.shuffleQuestions,
+            shuffleOptions: this.test.shuffleOptions,
+            showResults: this.test.showResults,
+            allowMultipleAttempts: this.test.allowMultipleAttempts,
+            accessCode: this.test.useAccessCode ? this.test.accessCode.trim() : null,
+            expiryDate: this.test.useExpiry ? this.test.expiryDate : null,
+            // ✅ FIX: backend expects 'questions' (array of IDs), not 'selectedQuestions'
+            questions: this.test.selectedQuestions
         };
 
         this.api.post('tests', payload).subscribe({
-            next: (data) => {
+            next: (data: any) => {
                 this.isLoading = false;
-                this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
+                if (data.uniqueLink) {
+                    this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
+                } else {
+                    // Fallback: show dashboard if link missing
+                    this.createError = 'Test created but link generation failed. Check the dashboard.';
+                }
             },
-            error: () => {
+            error: (err: any) => {
                 this.isLoading = false;
-                alert('Failed to create test');
+                const msg = err?.error?.message || 'Failed to create test. Please try again.';
+                this.createError = msg;
+                alert(msg);
             }
         });
     }
