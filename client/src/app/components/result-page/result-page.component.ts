@@ -16,6 +16,7 @@ export class ResultPageComponent implements OnInit {
     showResults = false;
     passed = false;
     percentage = 0;
+    testTitle = '';
 
     private apiUrl = environment.apiUrl;
 
@@ -27,10 +28,26 @@ export class ResultPageComponent implements OnInit {
             this.http.get(`${this.apiUrl}/attempts/${attemptId}`).subscribe({
                 next: (data: any) => {
                     this.result = data;
-                    this.showResults = data.showResults;
+
+                    // ✅ FIX: showResults lives on the Test, not the Attempt
+                    // attemptController.getAttempt populates test with 'title duration showResults'
+                    // so data.test is a populated object, not just an ID
+                    const test = data.test;
+                    if (test && typeof test === 'object') {
+                        this.showResults = test.showResults === true;
+                        this.testTitle = test.title || '';
+                    } else {
+                        // test not populated — default to not showing results
+                        this.showResults = false;
+                        this.testTitle = '';
+                    }
+
+                    // ✅ FIX: attach testTitle to result so template can use result.testTitle
+                    this.result.testTitle = this.testTitle;
+
                     this.loading = false;
 
-                    if (this.showResults && data.score !== undefined) {
+                    if (this.showResults && data.score !== undefined && data.totalQuestions > 0) {
                         this.percentage = Math.round((data.score / data.totalQuestions) * 100);
                         this.passed = this.percentage >= 60;
                     }
