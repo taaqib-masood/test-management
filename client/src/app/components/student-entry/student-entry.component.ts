@@ -37,12 +37,13 @@ export class StudentEntryComponent implements OnInit {
 
     loadTestInfo() {
         this.testLoading = true;
+        this.error = '';
         this.http.get(`${this.apiUrl}/tests/link/${this.testLink}`).subscribe({
             next: (test: any) => {
                 this.testInfo = test;
                 this.testLoading = false;
             },
-            error: (err) => {
+            error: (err: any) => {
                 this.error = err.error?.message || 'Test not found or no longer active';
                 this.testLoading = false;
             }
@@ -55,7 +56,14 @@ export class StudentEntryComponent implements OnInit {
             return;
         }
 
-        if (this.testInfo.hasAccessCode && !this.accessCode.trim()) {
+        const email = this.studentEmail.trim().toLowerCase();
+        if (!email.endsWith('@ltts.com')) {
+            this.error = 'Only @ltts.com email addresses are allowed';
+            return;
+        }
+
+        // ✅ FIX: backend returns 'requiresAccessCode', not 'hasAccessCode'
+        if (this.testInfo.requiresAccessCode && !this.accessCode.trim()) {
             this.error = 'Access code is required for this test';
             return;
         }
@@ -66,21 +74,23 @@ export class StudentEntryComponent implements OnInit {
         const payload: any = {
             testId: this.testInfo._id,
             studentName: this.studentName.trim(),
-            studentEmail: this.studentEmail.trim()
+            studentEmail: email
         };
 
-        if (this.testInfo.hasAccessCode) {
+        // ✅ FIX: use requiresAccessCode consistently
+        if (this.testInfo.requiresAccessCode) {
             payload.accessCode = this.accessCode.trim();
         }
 
         this.http.post(`${this.apiUrl}/attempts/start`, payload).subscribe({
             next: (attempt: any) => {
                 this.isLoading = false;
+                // Navigate to instructions page (or directly to take if no instructions)
                 this.router.navigate(['/test', this.testLink, 'instructions'], {
                     queryParams: { attemptId: attempt._id }
                 });
             },
-            error: (err) => {
+            error: (err: any) => {
                 this.isLoading = false;
                 this.error = err.error?.message || 'Failed to register. Please try again.';
             }
