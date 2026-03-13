@@ -8,10 +8,8 @@ const testSchema = new mongoose.Schema({
     },
     duration: {
         type: Number,
-        required: true  // in minutes
+        required: true
     },
-    // ✅ FIX: questions must be ObjectId refs to Question model, NOT embedded subdocuments
-    // Embedded subdocs can't be populated and break the entire question-loading flow
     questions: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Question'
@@ -47,16 +45,17 @@ const testSchema = new mongoose.Schema({
     uniqueLink: {
         type: String,
         unique: true,
-        sparse: true  // allows null without unique conflict
+        sparse: true
     }
 }, { timestamps: true });
 
-// Auto-generate uniqueLink before saving if not set
-testSchema.pre('save', function (next) {
+// ✅ FIX: Use async pre-save without 'next' parameter
+// The old version used function(next) but called next() incorrectly in some
+// Mongoose versions — switching to async avoids "next is not a function" error
+testSchema.pre('save', async function () {
     if (!this.uniqueLink) {
         this.uniqueLink = Math.random().toString(36).substring(2, 10);
     }
-    next();
 });
 
 module.exports = mongoose.model('Test', testSchema);
