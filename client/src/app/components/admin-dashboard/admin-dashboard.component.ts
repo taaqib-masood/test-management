@@ -11,7 +11,6 @@ import { AuthService } from '../../services/auth.service';
     templateUrl: './admin-dashboard.component.html'
 })
 export class AdminDashboardComponent implements OnInit {
-
     // ✅ FIX: initialise every field the template uses so nothing is undefined on first render
     stats: any = {
         totalTests: 0,
@@ -21,10 +20,12 @@ export class AdminDashboardComponent implements OnInit {
         totalQuestions: 0,
         recentAttempts: []
     };
-
     tests: any[] = [];
     isLoading = true;
     copiedLink = '';
+
+    // Tracks which test IDs have their access code currently revealed
+    revealedCodes: Set<string> = new Set();
 
     constructor(private api: ApiService, private authService: AuthService) { }
 
@@ -85,12 +86,28 @@ export class AdminDashboardComponent implements OnInit {
         });
     }
 
+    // Toggle the access code visibility for a specific test row
+    toggleCodeVisibility(testId: string, event: Event) {
+        event.stopPropagation();
+        if (this.revealedCodes.has(testId)) {
+            this.revealedCodes.delete(testId);
+        } else {
+            this.revealedCodes.add(testId);
+        }
+    }
+
+    isCodeRevealed(testId: string): boolean {
+        return this.revealedCodes.has(testId);
+    }
+
     deleteTest(test: any) {
         const msg = `Delete "${test.title}"?\n\nThis will permanently delete the test and all ${test.attemptCount || 0} student attempts. This cannot be undone.`;
         if (confirm(msg)) {
             this.api.delete(`tests/${test._id}`).subscribe({
                 next: () => {
                     this.tests = this.tests.filter(t => t._id !== test._id);
+                    // Also clean up the revealed set when a test is deleted
+                    this.revealedCodes.delete(test._id);
                     this.loadStats();
                 },
                 error: () => alert('Failed to delete test')
