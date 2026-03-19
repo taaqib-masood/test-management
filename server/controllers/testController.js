@@ -284,6 +284,34 @@ const toggleTest = async (req, res) => {
   }
 };
 
+// Update access code for a test (or remove it by sending empty string)
+// PUT /api/tests/:id/access-code
+const updateAccessCode = async (req, res) => {
+  try {
+    const test = await Test.findById(req.params.id);
+    if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    const { accessCode } = req.body;
+
+    // If empty string or not provided — remove the access code entirely
+    test.accessCode = (accessCode && accessCode.trim() !== '')
+      ? accessCode.trim()
+      : undefined;
+
+    await test.save();
+
+    res.json({
+      message: test.accessCode
+        ? 'Access code updated successfully'
+        : 'Access code removed successfully',
+      accessCode: test.accessCode || null
+    });
+  } catch (error) {
+    console.error('Update Access Code Error:', error);
+    res.status(500).json({ message: 'Error updating access code' });
+  }
+};
+
 // Delete a test
 // DELETE /api/tests/:id
 const deleteTest = async (req, res) => {
@@ -511,6 +539,7 @@ module.exports = {
   getTest,
   getAllQuestions,
   toggleTest,
+  updateAccessCode,
   deleteTest,
   deleteQuestion,
   deleteAllQuestions,
