@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
@@ -7,11 +8,10 @@ import { AuthService } from '../../services/auth.service';
 @Component({
     selector: 'app-admin-dashboard',
     standalone: true,
-    imports: [CommonModule, RouterLink],
+    imports: [CommonModule, RouterLink, FormsModule],
     templateUrl: './admin-dashboard.component.html'
 })
 export class AdminDashboardComponent implements OnInit {
-    // ✅ FIX: initialise every field the template uses so nothing is undefined on first render
     stats: any = {
         totalTests: 0,
         uniqueStudents: 0,
@@ -24,8 +24,13 @@ export class AdminDashboardComponent implements OnInit {
     isLoading = true;
     copiedLink = '';
 
-    // Tracks which test IDs have their access code currently revealed
+    // Access code reveal
     revealedCodes: Set<string> = new Set();
+
+    // Access code inline editing
+    editingCodeId: string | null = null;   // which test row is currently being edited
+    editCodeValue: string = '';            // current value in the input box
+    savingCodeId: string | null = null;    // which test is mid-save (shows spinner)
 
     constructor(private api: ApiService, private authService: AuthService) { }
 
@@ -37,7 +42,6 @@ export class AdminDashboardComponent implements OnInit {
     loadStats() {
         this.api.get('admin/stats').subscribe({
             next: (data: any) => {
-                // ✅ FIX: merge so missing fields fall back to 0 instead of undefined
                 this.stats = {
                     totalTests:     data.totalTests     ?? 0,
                     uniqueStudents: data.uniqueStudents ?? 0,
@@ -47,18 +51,13 @@ export class AdminDashboardComponent implements OnInit {
                     recentAttempts: data.recentAttempts ?? []
                 };
             },
-            error: (err: any) => {
-                console.error('Stats load error:', err);
-                // Leave defaults in place — don't crash
-            }
+            error: (err: any) => console.error('Stats load error:', err)
         });
     }
 
     loadTests() {
         this.api.get('tests').subscribe({
             next: (data: any[]) => {
-                // ✅ FIX: backend returns questionCount — map it to totalQuestions for the template
-                // Also default attemptCount/avgScore so template conditionals don't break
                 this.tests = (data || []).map(t => ({
                     ...t,
                     totalQuestions: t.questionCount ?? (t.questions?.length ?? 0),
@@ -86,7 +85,7 @@ export class AdminDashboardComponent implements OnInit {
         });
     }
 
-    // Toggle the access code visibility for a specific test row
+    // ── Access code reveal ──────────────────────────────────────────
     toggleCodeVisibility(testId: string, event: Event) {
         event.stopPropagation();
         if (this.revealedCodes.has(testId)) {
@@ -100,14 +99,72 @@ export class AdminDashboardComponent implements OnInit {
         return this.revealedCodes.has(testId);
     }
 
+    // ── Access code inline edit ─────────────────────────────────────
+
+    // Enter edit mode for a specific test row
+    startEditCode(test: any, event: Event) {
+        event.stopPropagation();
+        this.editingCodeId = test._id;
+        // Pre-fill with the current access code (or empty string if none)
+        this.editCodeValue = test.accessCode || '';
+        // Also reveal the code so admin can see what they're editing
+        this.revealedCodes.add(test._id);
+    }
+
+    // Cancel edit without saving
+    cancelEditCode(event: Event) {
+        event.stopPropagation();
+        this.editingCodeId = null;
+        this.editCodeValue = '';
+    }
+
+    // Save the updated access code to the backend
+    saveAccessCode(test: any, event: Event) {
+        event.stopPropagation();
+        const newCode = this.editCodeValue.trim();
+        this.savingCodeId = test._id;
+
+        this.api.put(`tests/${test._id}/access-code`, { accessCode: newCode }).subscribe({
+            next: () => {
+                // Update the local test object so the table reflects the change immediately
+                test.accessCode = newCode || null;
+                this.editingCodeId = null;
+                this.editCodeValue = '';
+                this.savingCodeId = null;
+                // Keep it revealed after save so admin can confirm the change
+                if (newCode) {
+                    this.revealedCodes.add(test._id);
+                } else {
+                    this.revealedCodes.delete(test._id);
+                }
+            },
+            error: () => {
+                alert('Failed to update access code. Please try again.');
+                this.savingCodeId = null;
+            }
+        });
+    }
+
+    isEditingCode(testId: string): boolean {
+        return this.editingCodeId === testId;
+    }
+
+    isSavingCode(testId: string): boolean {
+        return this.savingCodeId === testId;
+    }
+
+    // ── Other actions ───────────────────────────────────────────────
     deleteTest(test: any) {
         const msg = `Delete "${test.title}"?\n\nThis will permanently delete the test and all ${test.attemptCount || 0} student attempts. This cannot be undone.`;
         if (confirm(msg)) {
             this.api.delete(`tests/${test._id}`).subscribe({
                 next: () => {
                     this.tests = this.tests.filter(t => t._id !== test._id);
-                    // Also clean up the revealed set when a test is deleted
                     this.revealedCodes.delete(test._id);
+                    if (this.editingCodeId === test._id) {
+                        this.editingCodeId = null;
+                        this.editCodeValue = '';
+                    }
                     this.loadStats();
                 },
                 error: () => alert('Failed to delete test')
@@ -117,9 +174,7 @@ export class AdminDashboardComponent implements OnInit {
 
     toggleTest(test: any) {
         this.api.put(`tests/${test._id}/toggle`, {}).subscribe({
-            next: (updated: any) => {
-                test.isActive = updated.isActive;
-            },
+            next: (updated: any) => { test.isActive = updated.isActive; },
             error: () => alert('Failed to toggle test')
         });
     }
