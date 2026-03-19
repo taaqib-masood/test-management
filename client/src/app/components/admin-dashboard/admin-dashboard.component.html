@@ -98,49 +98,120 @@
                                 </button>
                             </td>
 
-                            <!-- Access Code Column -->
-                            <td>
-                                <!-- Test has no access code -->
-                                <span *ngIf="!test.accessCode" class="text-light text-sm">—</span>
+                            <!-- ── Access Code Column ── -->
+                            <td style="min-width: 200px;">
 
-                                <!-- Test has an access code -->
-                                <div *ngIf="test.accessCode"
-                                    style="display:flex; align-items:center; gap:8px;">
+                                <!-- EDIT MODE: inline input with save/cancel -->
+                                <div *ngIf="isEditingCode(test._id)"
+                                    style="display:flex; align-items:center; gap:6px;">
+                                    <input
+                                        [(ngModel)]="editCodeValue"
+                                        type="text"
+                                        placeholder="Enter code or leave empty to remove"
+                                        (click)="$event.stopPropagation()"
+                                        (keydown.enter)="saveAccessCode(test, $event)"
+                                        (keydown.escape)="cancelEditCode($event)"
+                                        style="padding:5px 10px; border:1.5px solid var(--primary); border-radius:8px;
+                                               font-size:13px; font-family:monospace; width:140px; outline:none;
+                                               background:rgba(255,255,255,0.9); color:var(--text-dark);"
+                                        autofocus />
 
-                                    <!-- Code display — masked or revealed -->
-                                    <span class="mono text-sm font-semibold"
+                                    <!-- Save button -->
+                                    <button
+                                        (click)="saveAccessCode(test, $event)"
+                                        [disabled]="isSavingCode(test._id)"
+                                        title="Save"
+                                        style="background:var(--green); border:none; border-radius:6px;
+                                               padding:5px 7px; cursor:pointer; display:flex; align-items:center;
+                                               opacity: 1; transition: opacity 0.2s;">
+                                        <!-- Spinner while saving -->
+                                        <span *ngIf="isSavingCode(test._id)"
+                                            class="spinner spinner-sm"
+                                            style="width:14px; height:14px; border-width:2px;
+                                                   border-color:rgba(255,255,255,0.3);
+                                                   border-top-color:#fff;">
+                                        </span>
+                                        <!-- Tick icon -->
+                                        <svg *ngIf="!isSavingCode(test._id)"
+                                            xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            fill="none" viewBox="0 0 24 24" stroke="white">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                stroke-width="3" d="M5 13l4 4L19 7" />
+                                        </svg>
+                                    </button>
+
+                                    <!-- Cancel button -->
+                                    <button
+                                        (click)="cancelEditCode($event)"
+                                        title="Cancel"
+                                        style="background:#e2e8f0; border:none; border-radius:6px;
+                                               padding:5px 7px; cursor:pointer; display:flex; align-items:center;">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            fill="none" viewBox="0 0 24 24" stroke="#64748b">
+                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    </button>
+                                </div>
+
+                                <!-- VIEW MODE: show masked/revealed code + eye + edit pencil -->
+                                <div *ngIf="!isEditingCode(test._id)"
+                                    style="display:flex; align-items:center; gap:6px;">
+
+                                    <!-- No access code set -->
+                                    <span *ngIf="!test.accessCode"
+                                        class="text-light text-sm"
+                                        style="min-width:80px; display:inline-block;">—</span>
+
+                                    <!-- Access code exists: show masked or revealed -->
+                                    <span *ngIf="test.accessCode"
+                                        class="mono text-sm font-semibold"
                                         [style.color]="isCodeRevealed(test._id) ? 'var(--primary-dark)' : 'var(--text-light)'"
                                         style="letter-spacing:0.05em; min-width:80px; display:inline-block;">
                                         {{ isCodeRevealed(test._id) ? test.accessCode : '••••••••' }}
                                     </span>
 
-                                    <!-- Eye toggle button -->
-                                    <button
+                                    <!-- Eye toggle (only when there's an access code) -->
+                                    <button *ngIf="test.accessCode"
                                         (click)="toggleCodeVisibility(test._id, $event)"
-                                        title="{{ isCodeRevealed(test._id) ? 'Hide access code' : 'Reveal access code' }}"
-                                        style="background:none; border:none; padding:4px; cursor:pointer; color:var(--text-light); display:flex; align-items:center; border-radius:6px; transition:color 0.2s;"
+                                        title="{{ isCodeRevealed(test._id) ? 'Hide code' : 'Reveal code' }}"
+                                        style="background:none; border:none; padding:3px; cursor:pointer;
+                                               display:flex; align-items:center; border-radius:4px;"
                                         [style.color]="isCodeRevealed(test._id) ? 'var(--primary)' : 'var(--text-light)'">
-
-                                        <!-- Eye open icon (shown when code is hidden — click to reveal) -->
+                                        <!-- Eye open -->
                                         <svg *ngIf="!isCodeRevealed(test._id)"
-                                            xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            xmlns="http://www.w3.org/2000/svg" width="15" height="15"
                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                         </svg>
-
-                                        <!-- Eye slash icon (shown when code is visible — click to hide) -->
+                                        <!-- Eye slash -->
                                         <svg *ngIf="isCodeRevealed(test._id)"
-                                            xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+                                            xmlns="http://www.w3.org/2000/svg" width="15" height="15"
                                             fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
                                         </svg>
                                     </button>
+
+                                    <!-- Edit pencil button — always visible -->
+                                    <button
+                                        (click)="startEditCode(test, $event)"
+                                        title="{{ test.accessCode ? 'Edit access code' : 'Add access code' }}"
+                                        style="background:none; border:none; padding:3px; cursor:pointer;
+                                               display:flex; align-items:center; border-radius:4px;
+                                               color:var(--text-light);">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                                        </svg>
+                                    </button>
                                 </div>
                             </td>
+                            <!-- ── End Access Code Column ── -->
 
                             <td class="text-mid text-sm">{{ test.createdAt | date:'shortDate' }}</td>
                             <td>
