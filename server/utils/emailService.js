@@ -2,17 +2,22 @@
 // server/utils/emailService.js
 // ==============================
 // Setup: add these to your server/.env file
-//   EMAIL_USER=your-gmail@gmail.com
-//   EMAIL_PASS=your-gmail-app-password   (NOT your normal password — generate an App Password in Google Account > Security > 2FA > App Passwords)
+//   EMAIL_USER=yourname@ltts.com
+//   EMAIL_PASS=your-ltts-email-password
 
 const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
   return nodemailer.createTransport({
-    service: 'gmail',
+    host: 'smtp.office365.com',
+    port: 587,
+    secure: false,
     auth: {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASS
+    },
+    tls: {
+      ciphers: 'SSLv3'
     }
   });
 };
@@ -41,16 +46,13 @@ const sendTestInvites = async (emails, testTitle, testLink, duration, expiryDate
           <h1 style="color:#fff; margin:0; font-size:24px;">LTTS Test Portal</h1>
           <p style="color:rgba(255,255,255,0.85); margin:8px 0 0; font-size:15px;">You have been invited to take an assessment</p>
         </div>
-
         <div style="padding:32px;">
           <h2 style="color:#1e293b; margin:0 0 8px; font-size:20px;">${testTitle}</h2>
           <p style="color:#64748b; font-size:14px; margin:0 0 24px;">⏱ Duration: <strong>${duration} minutes</strong></p>
           ${expiryText}
-
           <p style="color:#334155; font-size:15px; line-height:1.6; margin:0 0 28px;">
             You have been selected to complete this assessment. Please click the button below to begin. Make sure you have a stable internet connection before starting.
           </p>
-
           <div style="text-align:center; margin-bottom:28px;">
             <a href="${testLink}"
                style="display:inline-block; background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff;
@@ -59,12 +61,10 @@ const sendTestInvites = async (emails, testTitle, testLink, duration, expiryDate
               Start Assessment →
             </a>
           </div>
-
           <p style="color:#94a3b8; font-size:13px; text-align:center; margin:0;">
             Or copy this link: <a href="${testLink}" style="color:#6366f1;">${testLink}</a>
           </p>
         </div>
-
         <div style="background:#f8fafc; padding:20px; text-align:center; border-top:1px solid #e2e8f0;">
           <p style="color:#94a3b8; font-size:12px; margin:0;">
             This is an automated message from LTTS Test Portal. Please do not reply to this email.
