@@ -1,32 +1,30 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ApiService } from '../../services/api.service';
 import { Router } from '@angular/router';
+import { ApiService } from '../../services/api.service';
 
 @Component({
     selector: 'app-analytics-dashboard',
     standalone: true,
-    imports: [CommonModule, FormsModule],
+    imports: [CommonModule],
     templateUrl: './analytics-dashboard.component.html'
 })
 export class AnalyticsDashboardComponent implements OnInit {
+
     allTests: any[] = [];
-    selectedTestIds: Set<string> = new Set();
+    selectedTestIds: string[] = [];
     analytics: any = null;
     loading = false;
     loadingTests = true;
     error = '';
-
-    expandedTest: string | null = null;
+    expandedTestId: string | null = null;
 
     constructor(private api: ApiService, private router: Router) { }
 
     ngOnInit() {
-        // Load test list from the tests endpoint
-        this.api.get('tests').subscribe({
+        this.api.get('admin/analytics').subscribe({
             next: (data: any) => {
-                this.allTests = Array.isArray(data) ? data : [];
+                this.allTests = data.tests || [];
                 this.loadingTests = false;
             },
             error: () => {
@@ -36,31 +34,31 @@ export class AnalyticsDashboardComponent implements OnInit {
         });
     }
 
-    toggleTest(testId: string) {
-        if (this.selectedTestIds.has(testId)) {
-            this.selectedTestIds.delete(testId);
-        } else {
-            this.selectedTestIds.add(testId);
-        }
+    toggleTest(id: string) {
+        const idx = this.selectedTestIds.indexOf(id);
+        if (idx > -1) this.selectedTestIds.splice(idx, 1);
+        else this.selectedTestIds.push(id);
     }
 
-    isTestSelected(testId: string): boolean {
-        return this.selectedTestIds.has(testId);
+    isTestSelected(id: string): boolean {
+        return this.selectedTestIds.includes(id);
     }
 
-    selectAll() { this.allTests.forEach(t => this.selectedTestIds.add(t._id)); }
+    selectAll() {
+        this.selectedTestIds = this.allTests.map((t: any) => t._id);
+        this.loadAnalytics();
+    }
 
     clearSelection() {
-        this.selectedTestIds.clear();
+        this.selectedTestIds = [];
         this.analytics = null;
     }
 
     loadAnalytics() {
-        if (this.selectedTestIds.size === 0) return;
+        if (this.selectedTestIds.length === 0) return;
         this.loading = true;
         this.error = '';
-        const ids = Array.from(this.selectedTestIds).join(',');
-        this.api.get(`admin/analytics?testIds=${ids}`).subscribe({
+        this.api.get('admin/analytics?testIds=' + this.selectedTestIds.join(',')).subscribe({
             next: (data: any) => {
                 this.analytics = data;
                 this.loading = false;
@@ -72,8 +70,8 @@ export class AnalyticsDashboardComponent implements OnInit {
         });
     }
 
-    toggleExpandedTest(testId: string) {
-        this.expandedTest = this.expandedTest === testId ? null : testId;
+    toggleExpandedTest(id: string) {
+        this.expandedTestId = this.expandedTestId === id ? null : id;
     }
 
     getPassPercent(): number {
@@ -81,36 +79,58 @@ export class AnalyticsDashboardComponent implements OnInit {
         return Math.round((this.analytics.summary.passCount / this.analytics.summary.totalAttempts) * 100);
     }
 
-    getFailPercent(): number { return 100 - this.getPassPercent(); }
+    getFailPercent(): number {
+        return 100 - this.getPassPercent();
+    }
+
+    getPassDeg(): number {
+        return Math.round((this.getPassPercent() / 100) * 360);
+    }
+
+    getBarMax(): number {
+        if (!this.analytics?.scoreDistribution) return 1;
+        return Math.max(...this.analytics.scoreDistribution.map((b: any) => b.count), 1);
+    }
 
     getBarWidth(count: number): number {
-        if (!this.analytics?.scoreDistribution) return 0;
-        const max = Math.max(...this.analytics.scoreDistribution.map((b: any) => b.count), 1);
-        return Math.round((count / max) * 100);
+        return Math.round((count / this.getBarMax()) * 100);
     }
 
-    getTimeBarHeight(score: number): number {
-        return Math.round((score / 100) * 100);
+    getTimeBarMax(): number {
+        if (!this.analytics?.performanceOverTime?.length) return 100;
+        return Math.max(...this.analytics.performanceOverTime.map((d: any) => d.avgScore), 1);
     }
 
-    getHeatColor(count: number, maxCount: number): string {
-        if (maxCount === 0 || count === 0) return '#f1f5f9';
-        const intensity = count / maxCount;
-        if (intensity <= 0.25) return '#dbeafe';
-        if (intensity <= 0.5)  return '#93c5fd';
-        if (intensity <= 0.75) return '#3b82f6';
-        return '#1d4ed8';
-    }
-
-    getHeatTextColor(count: number, maxCount: number): string {
-        if (maxCount === 0 || count === 0) return '#94a3b8';
-        const intensity = count / maxCount;
-        return intensity > 0.5 ? '#ffffff' : '#1e293b';
+    getTimeBarHeight(avgScore: number): number {
+        return Math.round((avgScore / this.getTimeBarMax()) * 100);
     }
 
     getHeatmapMax(heatmapGrid: any[]): number {
-        if (!heatmapGrid?.length) return 1;
+        if (!heatmapGrid) return 1;
         return Math.max(...heatmapGrid.flatMap((row: any) => row.buckets), 1);
+    }
+
+    getHeatColor(value: number, max: number): string {
+        if (max === 0 || value === 0) return '#f1f5f9';
+        const intensity = value / max;
+        if (intensity < 0.25) return '#dbeafe';
+        if (intensity < 0.5) return '#93c5fd';
+        if (intensity < 0.75) return '#3b82f6';
+        return '#1d4ed8';
+    }
+
+    getHeatTextColor(value: number, max: number): string {
+        if (max === 0 || value === 0) return '#94a3b8';
+        return (value / max) >= 0.5 ? '#ffffff' : '#1e293b';
+    }
+
+    getDifficultyColor(diff: string): string {
+        switch (diff) {
+            case 'easy': return '#22c55e';
+            case 'medium': return '#f59e0b';
+            case 'hard': return '#ef4444';
+            default: return '#94a3b8';
+        }
     }
 
     formatTime(seconds: number): string {
@@ -121,17 +141,11 @@ export class AnalyticsDashboardComponent implements OnInit {
     }
 
     formatDate(dateStr: string): string {
-        return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+        if (!dateStr) return '';
+        return new Date(dateStr).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
     }
 
-    getDifficultyColor(diff: string): string {
-        switch (diff) {
-            case 'easy': return '#22c55e';
-            case 'medium': return '#f59e0b';
-            case 'hard': return '#ef4444';
-            default: return 'var(--text-light)';
-        }
+    goBack() {
+        this.router.navigate(['/admin']);
     }
-
-    goBack() { this.router.navigate(['/admin']); }
 }
