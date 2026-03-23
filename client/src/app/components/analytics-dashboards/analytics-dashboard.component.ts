@@ -18,15 +18,15 @@ export class AnalyticsDashboardComponent implements OnInit {
     loadingTests = true;
     error = '';
 
-    // Track which per-test section is expanded
     expandedTest: string | null = null;
 
     constructor(private api: ApiService, private router: Router) { }
 
     ngOnInit() {
-        this.api.get('admin/analytics').subscribe({
+        // Load test list from the tests endpoint
+        this.api.get('tests').subscribe({
             next: (data: any) => {
-                this.allTests = data.tests || [];
+                this.allTests = Array.isArray(data) ? data : [];
                 this.loadingTests = false;
             },
             error: () => {
@@ -62,7 +62,7 @@ export class AnalyticsDashboardComponent implements OnInit {
         const ids = Array.from(this.selectedTestIds).join(',');
         this.api.get(`admin/analytics?testIds=${ids}`).subscribe({
             next: (data: any) => {
-                this.analytics = data.analytics;
+                this.analytics = data;
                 this.loading = false;
             },
             error: () => {
@@ -76,33 +76,30 @@ export class AnalyticsDashboardComponent implements OnInit {
         this.expandedTest = this.expandedTest === testId ? null : testId;
     }
 
-    // ── Pass/Fail helpers ──
     getPassPercent(): number {
         if (!this.analytics?.summary?.totalAttempts) return 0;
         return Math.round((this.analytics.summary.passCount / this.analytics.summary.totalAttempts) * 100);
     }
+
     getFailPercent(): number { return 100 - this.getPassPercent(); }
 
-    // ── Score distribution bar scale ──
     getBarWidth(count: number): number {
         if (!this.analytics?.scoreDistribution) return 0;
         const max = Math.max(...this.analytics.scoreDistribution.map((b: any) => b.count), 1);
         return Math.round((count / max) * 100);
     }
 
-    // ── Performance over time: scale bar heights ──
     getTimeBarHeight(score: number): number {
         return Math.round((score / 100) * 100);
     }
 
-    // ── Difficulty heatmap: colour by density ──
     getHeatColor(count: number, maxCount: number): string {
         if (maxCount === 0 || count === 0) return '#f1f5f9';
         const intensity = count / maxCount;
-        if (intensity <= 0.25) return '#dbeafe';   // light blue — few questions here
-        if (intensity <= 0.5)  return '#93c5fd';   // medium blue
-        if (intensity <= 0.75) return '#3b82f6';   // blue
-        return '#1d4ed8';                           // dark blue — many questions here
+        if (intensity <= 0.25) return '#dbeafe';
+        if (intensity <= 0.5)  return '#93c5fd';
+        if (intensity <= 0.75) return '#3b82f6';
+        return '#1d4ed8';
     }
 
     getHeatTextColor(count: number, maxCount: number): string {
@@ -112,6 +109,7 @@ export class AnalyticsDashboardComponent implements OnInit {
     }
 
     getHeatmapMax(heatmapGrid: any[]): number {
+        if (!heatmapGrid?.length) return 1;
         return Math.max(...heatmapGrid.flatMap((row: any) => row.buckets), 1);
     }
 
