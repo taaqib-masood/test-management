@@ -1,6 +1,3 @@
-// ==============================
-// adminRoutes.js
-// ==============================
 const express = require('express');
 const router = express.Router();
 const xlsx = require('xlsx');
@@ -77,7 +74,6 @@ router.get('/analytics', protect, admin, async (req, res) => {
         : testIds.split(',').map(id => id.trim()).filter(Boolean);
     }
 
-    // No testIds — just return all tests for the selector
     if (testIdArray.length === 0) {
       const allTests = await Test.find({}, '_id title createdAt').sort({ createdAt: -1 });
       return res.json({ tests: allTests, analytics: null });
@@ -85,9 +81,9 @@ router.get('/analytics', protect, admin, async (req, res) => {
 
     const tests = await Test.find({ _id: { $in: testIdArray } }).populate('questions');
     const attempts = await Attempt.find({ test: { $in: testIdArray }, completed: true })
-      .sort({ endTime: 1 });   // sorted ascending for time-series chart
+      .sort({ endTime: 1 });
 
-    // ── Overall summary ──────────────────────────────────────────
+    // ── Overall summary ──
     const totalAttempts = attempts.length;
     const uniqueStudents = [...new Set(attempts.map(a => a.studentEmail))].length;
     const passCount = attempts.filter(a =>
@@ -103,7 +99,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
       ? Math.round(attempts.reduce((s, a) => s + (a.timeTaken || 0), 0) / totalAttempts)
       : 0;
 
-    // ── Score distribution (10 buckets 0–100%) ───────────────────
+    // ── Score distribution (10 buckets 0–100%) ──
     const buckets = Array(10).fill(0);
     attempts.forEach(a => {
       if (a.totalQuestions > 0) {
@@ -113,12 +109,11 @@ router.get('/analytics', protect, admin, async (req, res) => {
       }
     });
     const scoreDistribution = buckets.map((count, i) => ({
-      range: `${i * 10}–${i * 10 + 10}%`,
+      range: `${i * 10}-${i * 10 + 10}`,
       count
     }));
 
-    // ── Student performance over time ─────────────────────────────
-    // Group attempts by date (YYYY-MM-DD) — track daily avg score and attempt count
+    // ── Performance over time (daily avg score) ──
     const timeMap = {};
     attempts.forEach(a => {
       if (!a.endTime) return;
@@ -130,14 +125,14 @@ router.get('/analytics', protect, admin, async (req, res) => {
     });
     const performanceOverTime = Object.values(timeMap)
       .sort((a, b) => a.date.localeCompare(b.date))
-      .map((d) => ({
+      .map(d => ({
         date: d.date,
         avgScore: d.count > 0 ? parseFloat((d.totalPct / d.count).toFixed(1)) : 0,
         attempts: d.count,
         passCount: d.passCount
       }));
 
-    // ── Per-test breakdown + question stats ───────────────────────
+    // ── Per-test breakdown ──
     const perTest = tests.map(test => {
       const testAttempts = attempts.filter(a => a.test.toString() === test._id.toString());
       const tCount = testAttempts.length;
@@ -150,7 +145,8 @@ router.get('/analytics', protect, admin, async (req, res) => {
           ) / tCount).toFixed(1))
         : 0;
 
-      const questionStats = (test.questions || []).map(q => {
+      // Per-question stats
+      const questions = (test.questions || []).map(q => {
         let correct = 0, total = 0, timeSum = 0;
         testAttempts.forEach(attempt => {
           const ans = (attempt.answers || []).find(
@@ -175,14 +171,11 @@ router.get('/analytics', protect, admin, async (req, res) => {
         };
       });
 
-      // ── Difficulty heatmap data for this test ──
-      // Group questions by difficulty × correctPercent bucket
-      // Returns a 3×5 grid: rows = difficulty, cols = score range 0-20,21-40,...,81-100
+      // Difficulty heatmap: 3 rows (easy/medium/hard) x 5 cols (0-20,21-40,41-60,61-80,81-100)
       const heatmapDifficulties = ['easy', 'medium', 'hard'];
-      const heatmapBucketLabels = ['0–20%', '21–40%', '41–60%', '61–80%', '81–100%'];
       const heatmapGrid = heatmapDifficulties.map(diff => {
-        const diffQs = questionStats.filter(q => q.difficulty === diff);
-        const row = [0, 0, 0, 0, 0];   // 5 buckets
+        const diffQs = questions.filter(q => q.difficulty === diff);
+        const row = [0, 0, 0, 0, 0];
         diffQs.forEach(q => {
           const idx = Math.min(Math.floor(q.correctPercent / 20), 4);
           row[idx]++;
@@ -192,41 +185,39 @@ router.get('/analytics', protect, admin, async (req, res) => {
 
       return {
         testId: test._id,
-        title: test.title,
+        testTitle: test.title,
         totalAttempts: tCount,
         passCount: tPass,
         failCount: tCount - tPass,
         avgScore: tAvg,
-        questionStats,
-        heatmapGrid,
-        heatmapBucketLabels
+        questions,
+        heatmapGrid
       };
     });
 
-    // ── Top performers across selected tests ──────────────────────
+    // ── Top performers ──
     const studentMap = {};
     attempts.forEach(a => {
       const key = a.studentEmail;
       if (!studentMap[key]) {
-        studentMap[key] = { name: a.studentName, email: a.studentEmail, attempts: 0, totalPct: 0 };
+        studentMap[key] = { studentName: a.studentName, studentEmail: a.studentEmail, testsTaken: 0, totalPct: 0, bestScore: 0 };
       }
-      studentMap[key].attempts++;
-      studentMap[key].totalPct += a.totalQuestions > 0 ? (a.score / a.totalQuestions) * 100 : 0;
+      studentMap[key].testsTaken++;
+      const pct = a.totalQuestions > 0 ? Math.round((a.score / a.totalQuestions) * 100) : 0;
+      studentMap[key].totalPct += pct;
+      if (pct > studentMap[key].bestScore) studentMap[key].bestScore = pct;
     });
     const topStudents = Object.values(studentMap)
-      .map(s => ({ ...s, avgScore: parseFloat((s.totalPct / s.attempts).toFixed(1)) }))
+      .map(s => ({ ...s, avgScore: parseFloat((s.totalPct / s.testsTaken).toFixed(1)) }))
       .sort((a, b) => b.avgScore - a.avgScore)
       .slice(0, 10);
 
     res.json({
-      tests: tests.map(t => ({ _id: t._id, title: t.title })),
-      analytics: {
-        summary: { totalAttempts, uniqueStudents, passCount, failCount, avgScore, avgTime },
-        scoreDistribution,
-        performanceOverTime,
-        perTest,
-        topStudents
-      }
+      summary: { totalAttempts, uniqueStudents, passCount, failCount, avgScore, avgTime },
+      scoreDistribution,
+      performanceOverTime,
+      perTest,
+      topStudents
     });
   } catch (error) {
     console.error('Analytics Error:', error);
