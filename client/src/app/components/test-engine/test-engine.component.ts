@@ -13,9 +13,9 @@ import { environment } from '../../../environments/environment';
     styleUrls: ['./test-engine.component.css']
 })
 export class TestEngineComponent implements OnInit, OnDestroy {
-    attemptId: string = '';
-    testId: string = '';
-    link: string = '';
+    attemptId = '';
+    testId = '';
+    link = '';
     currentQuestionIndex = 0;
     timeLeft = 0;
     timerSubscription: Subscription | null = null;
@@ -27,15 +27,14 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     questionTimes: { [key: string]: number } = {};
     questionStartTime: number = Date.now();
 
-    warnings = 0;
+    // Tab switch settings loaded from test
+    tabSwitchLimit = 3;   // -1 = block, 0 = off, N = limit
+
+    // Runtime tab switch state
     tabSwitchCount = 0;
     showTabWarning = false;
-
-    // ✅ NEW: dynamic limit loaded from test config (default 3, 0 = unlimited)
-    tabSwitchLimit = 3;
-
-    isLoading = true;
-    loadError = '';
+    tabWarningMessage = '';
+    isBlocked = false;    // true briefly when in block mode to show overlay
 
     private apiUrl = environment.apiUrl;
 
@@ -45,6 +44,16 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
     get timeRemaining() {
         return this.timeLeft;
+    }
+
+    // Whether tab switching is completely blocked (no submit)
+    get isBlockMode(): boolean {
+        return this.tabSwitchLimit === -1;
+    }
+
+    // Whether auto-submit after N switches
+    get isLimitMode(): boolean {
+        return this.tabSwitchLimit > 0;
     }
 
     constructor(
@@ -83,29 +92,20 @@ export class TestEngineComponent implements OnInit, OnDestroy {
                 }
                 if (attempt.tabSwitchCount) {
                     this.tabSwitchCount = attempt.tabSwitchCount;
-                    this.warnings = attempt.tabSwitchCount;
                 }
 
                 this.http.get(`${this.apiUrl}/tests/${this.testId}/questions`).subscribe({
                     next: (data: any) => {
                         this.testTitle = data.title;
-                        this.questions = (data.questions || []).filter((q: any) => q !== null);
+                        this.questions = data.questions;
                         this.timeLeft = Math.max(0, (data.duration * 60) - Math.floor((Date.now() - startTime) / 1000));
 
-                        // ✅ NEW: load tabSwitchLimit from the test config
-                        if (data.tabSwitchLimit !== undefined) {
-                            this.tabSwitchLimit = data.tabSwitchLimit;
-                        }
-
-                        if (this.questions.length === 0) {
-                            this.loadError = 'This test has no questions yet.';
-                            this.isLoading = false;
-                            return;
-                        }
+                        // Load tabSwitchLimit from test (-1, 0, or N)
+                        this.tabSwitchLimit = data.tabSwitchLimit !== undefined ? data.tabSwitchLimit : 3;
 
                         if (attempt.answers && Array.isArray(attempt.answers)) {
                             attempt.answers.forEach((ans: any) => {
-                                const q = this.questions.find((q: any) => q._id === ans.questionId);
+                                const q = this.questions.find(q => q._id === ans.questionId);
                                 if (q && q.options && ans.selectedOption) {
                                     const idx = q.options.indexOf(ans.selectedOption);
                                     if (idx !== -1) this.answers[ans.questionId] = idx;
@@ -113,30 +113,26 @@ export class TestEngineComponent implements OnInit, OnDestroy {
                             });
                         }
 
-                        this.isLoading = false;
                         this.questionStartTime = Date.now();
                         this.startTimer();
                     },
                     error: () => {
-                        this.loadError = 'Failed to load questions. Please try again.';
-                        this.isLoading = false;
+                        alert('Failed to load questions.');
+                        this.router.navigate(['/test', this.link]);
                     }
                 });
             },
             error: () => {
-                this.loadError = 'Failed to load attempt. Please try again.';
-                this.isLoading = false;
+                alert('Failed to load attempt.');
+                this.router.navigate(['/test', this.link]);
             }
         });
     }
 
     startTimer() {
         this.timerSubscription = interval(1000).subscribe(() => {
-            if (this.timeLeft > 0) {
-                this.timeLeft--;
-            } else {
-                this.autoSubmit();
-            }
+            if (this.timeLeft > 0) this.timeLeft--;
+            else this.autoSubmit();
         });
     }
 
@@ -156,7 +152,9 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     selectOption(index: number) {
-        if (this.currentQuestion) this.answers[this.currentQuestion._id] = index;
+        if (this.currentQuestion) {
+            this.answers[this.currentQuestion._id] = index;
+        }
     }
 
     getSelectedOption(): number | null {
@@ -191,7 +189,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
     private formatAnswers() {
         return Object.keys(this.answers).map(qId => {
-            const q = this.questions.find((fq: any) => fq._id === qId);
+            const q = this.questions.find(fq => fq._id === qId);
             return {
                 questionId: qId,
                 selectedOption: q ? q.options[this.answers[qId]] : null,
@@ -201,9 +199,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     submitTest() {
-        if (confirm('Are you sure you want to submit?')) {
-            this.doSubmit();
-        }
+        if (confirm('Are you sure you want to submit?')) this.doSubmit();
     }
 
     autoSubmit() {
@@ -220,23 +216,58 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             answers: formattedAnswers,
             tabSwitchCount: this.tabSwitchCount
         }).subscribe({
-            next: () => { this.router.navigate(['/result', this.attemptId]); },
-            error: () => { alert('Submission failed. Please try again.'); }
+            next: () => this.router.navigate(['/result', this.attemptId]),
+            error: () => alert('Submission failed. Please try again.')
         });
     }
 
     @HostListener('document:visibilitychange')
-    visibilityChange() {
-        if (document.hidden) {
-            this.warnings++;
-            this.tabSwitchCount++;
-            this.showTabWarning = true;
-            setTimeout(() => this.showTabWarning = false, 5000);
+    onVisibilityChange() {
+        if (!document.hidden) return;  // only act when tab is hidden
 
-            // ✅ CHANGED: use dynamic tabSwitchLimit (0 means unlimited — never auto-submit)
-            if (this.tabSwitchLimit > 0 && this.warnings >= this.tabSwitchLimit) {
-                this.autoSubmit();
+        // Off mode — do nothing
+        if (this.tabSwitchLimit === 0) return;
+
+        if (this.isBlockMode) {
+            // Block mode — refocus immediately, show brief overlay, no submit
+            this.isBlocked = true;
+            this.tabWarningMessage = '🚫 Tab switching is not allowed during this test.';
+            this.showTabWarning = true;
+            setTimeout(() => {
+                this.showTabWarning = false;
+                this.isBlocked = false;
+                window.focus();
+            }, 2500);
+            // Force focus back
+            window.focus();
+            return;
+        }
+
+        if (this.isLimitMode) {
+            // Limit mode — count switch, warn, auto-submit if over limit
+            this.tabSwitchCount++;
+            const remaining = this.tabSwitchLimit - this.tabSwitchCount;
+
+            if (remaining <= 0) {
+                this.tabWarningMessage = `⚠️ Too many tab switches (${this.tabSwitchCount}/${this.tabSwitchLimit}). Auto-submitting your test now.`;
+                this.showTabWarning = true;
+                setTimeout(() => this.autoSubmit(), 2000);
+            } else {
+                this.tabWarningMessage = `⚠️ Tab switch detected! (${this.tabSwitchCount}/${this.tabSwitchLimit}) — ${remaining} more will auto-submit your test.`;
+                this.showTabWarning = true;
+                setTimeout(() => this.showTabWarning = false, 4000);
             }
+        }
+    }
+
+    @HostListener('window:blur')
+    onWindowBlur() {
+        // Also catch window losing focus (e.g. Alt+Tab to another app)
+        if (this.tabSwitchLimit === 0) return;
+
+        if (this.isBlockMode) {
+            // Refocus the window
+            setTimeout(() => window.focus(), 100);
         }
     }
 
