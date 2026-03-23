@@ -8,12 +8,14 @@ import { TestInstructionsComponent } from './components/test-instructions/test-i
 import { TestEngineComponent } from './components/test-engine/test-engine.component';
 import { ResultPageComponent } from './components/result-page/result-page.component';
 import { TestResultsComponent } from './components/test-results/test-results.component';
+import { AnalyticsDashboardComponent } from './components/analytics-dashboard/analytics-dashboard.component';
 
 export const routes: Routes = [
     { path: 'login', component: LoginComponent },
     { path: 'admin', component: AdminDashboardComponent },
     { path: 'admin/question-bank', component: QuestionBankComponent },
     { path: 'admin/create-test', component: CreateTestComponent },
+    { path: 'admin/analytics', component: AnalyticsDashboardComponent },
     { path: 'admin/test/:id/results', component: TestResultsComponent },
     { path: 'test/:link', component: StudentEntryComponent },
     { path: 'test/:link/instructions', component: TestInstructionsComponent },
