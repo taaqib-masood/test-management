@@ -2,18 +2,32 @@
     <div class="blob blob-1"></div>
     <div class="blob blob-2"></div>
 
-    <!-- Tab Switch Warning -->
-    <div *ngIf="showTabWarning"
-        style="position:fixed; top:0; left:0; right:0; z-index:9999; background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff; padding:14px 24px; text-align:center; font-weight:700; font-size:15px; box-shadow:0 4px 20px rgba(239,68,68,0.4); animation:slideDown 0.3s ease;">
-        ⚠️ Tab switch detected! ({{ tabSwitchCount }}/3) — Your test will be auto-submitted after 3 switches.
+    <!-- ── Block mode overlay (full screen, cannot dismiss) ── -->
+    <div *ngIf="isBlocked"
+        style="position:fixed; inset:0; z-index:99999; background:rgba(0,0,0,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;">
+        <div style="font-size:56px;">🚫</div>
+        <h2 style="color:#fff; font-size:24px; font-weight:800; text-align:center; max-width:480px;">
+            Tab switching is not allowed
+        </h2>
+        <p style="color:rgba(255,255,255,0.7); font-size:15px; text-align:center; max-width:400px;">
+            Please stay on this tab for the duration of the test. Returning you now...
+        </p>
+    </div>
+
+    <!-- ── Limit mode warning banner ── -->
+    <div *ngIf="showTabWarning && !isBlocked"
+        style="position:fixed; top:0; left:0; right:0; z-index:9999;
+               background:linear-gradient(135deg,#ef4444,#dc2626); color:#fff;
+               padding:14px 24px; text-align:center; font-weight:700; font-size:15px;
+               box-shadow:0 4px 20px rgba(239,68,68,0.4);">
+        {{ tabWarningMessage }}
     </div>
 
     <!-- Header / Timer Bar -->
     <header class="glass-nav" style="padding-left:24px; padding-right:24px;">
         <div class="flex items-center gap-3">
             <div style="padding:8px; background:#eef2ff; border-radius:10px; color:var(--primary);">
-                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
@@ -21,11 +35,25 @@
             <h1 class="text-xl font-bold text-dark">{{ testTitle || 'Assessment' }}</h1>
         </div>
 
-        <div style="text-align:right;">
-            <div class="text-xs text-light font-semibold uppercase tracking-wider">Time Remaining</div>
-            <div class="text-2xl font-bold mono" [style.color]="timeRemaining > 60 ? 'var(--primary)' : 'var(--red)'"
-                [class.pulse]="timeRemaining <= 60">
-                {{ formatTime(timeRemaining) }}
+        <div style="display:flex; align-items:center; gap:16px;">
+            <!-- Tab switch indicator (only shown in limit mode) -->
+            <div *ngIf="isLimitMode && tabSwitchCount > 0"
+                style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; color:#dc2626;">
+                ⚠️ {{ tabSwitchCount }}/{{ tabSwitchLimit }} switches
+            </div>
+            <!-- Block mode badge -->
+            <div *ngIf="isBlockMode"
+                style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:4px 10px; font-size:12px; font-weight:700; color:#dc2626;">
+                🚫 Tab lock active
+            </div>
+
+            <div style="text-align:right;">
+                <div class="text-xs text-light font-semibold uppercase tracking-wider">Time Remaining</div>
+                <div class="text-2xl font-bold mono"
+                    [style.color]="timeRemaining > 60 ? 'var(--primary)' : 'var(--red)'"
+                    [class.pulse]="timeRemaining <= 60">
+                    {{ formatTime(timeRemaining) }}
+                </div>
             </div>
         </div>
     </header>
@@ -49,11 +77,13 @@
 
             <!-- Options -->
             <div style="display:flex; flex-direction:column; gap:14px;">
-                <button *ngFor="let option of currentQuestion.options; let i = index" (click)="selectOption(i)"
-                    class="option-btn" [class.selected]="getSelectedOption() === i">
+                <button *ngFor="let option of currentQuestion.options; let i = index"
+                    (click)="selectOption(i)"
+                    class="option-btn"
+                    [class.selected]="getSelectedOption() === i">
                     <div class="option-radio">
-                        <svg *ngIf="getSelectedOption() === i" class="option-check" xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20" fill="white">
+                        <svg *ngIf="getSelectedOption() === i" class="option-check"
+                            xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="white">
                             <path fill-rule="evenodd"
                                 d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                                 clip-rule="evenodd" />
@@ -67,35 +97,24 @@
 
     <!-- Navigation Footer -->
     <footer class="glass-nav" style="border-top:1px solid rgba(255,255,255,0.3); border-bottom:none;">
-        <div
-            style="max-width:860px; margin:0 auto; width:100%; display:flex; justify-content:space-between; align-items:center;">
+        <div style="max-width:860px; margin:0 auto; width:100%; display:flex; justify-content:space-between; align-items:center;">
             <button (click)="prevQuestion()" [disabled]="currentQuestionIndex === 0" class="btn btn-ghost">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                 </svg>
                 Previous
             </button>
 
-            <!-- Progress Dots -->
-            <div class="flex gap-2" style="display:none;">
-                <!-- Hidden on mobile, optional on desktop -->
-            </div>
-
-            <button *ngIf="currentQuestionIndex < questions.length - 1" (click)="nextQuestion()"
-                class="btn btn-primary">
+            <button *ngIf="currentQuestionIndex < questions.length - 1" (click)="nextQuestion()" class="btn btn-primary">
                 Next
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
                 </svg>
             </button>
 
-            <button *ngIf="currentQuestionIndex === questions.length - 1" (click)="submitTest()"
-                class="btn btn-success btn-lg">
+            <button *ngIf="currentQuestionIndex === questions.length - 1" (click)="submitTest()" class="btn btn-success btn-lg">
                 Submit Assessment
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
-                    stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
                 </svg>
             </button>
