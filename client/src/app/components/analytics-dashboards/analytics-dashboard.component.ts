@@ -1,12 +1,13 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { ApiService } from '../../services/api.service';
 
 @Component({
     selector: 'app-analytics-dashboard',
     standalone: true,
-    imports: [CommonModule],
+    imports: [CommonModule, FormsModule],
     templateUrl: './analytics-dashboard.component.html'
 })
 export class AnalyticsDashboardComponent implements OnInit {
@@ -18,6 +19,11 @@ export class AnalyticsDashboardComponent implements OnInit {
     loadingTests = true;
     error = '';
     expandedTestId: string | null = null;
+
+    // Pass/fail cut-off
+    cutoff: number = 60;
+    editingCutoff: boolean = false;
+    cutoffDraft: number = 60;
 
     constructor(private api: ApiService, private router: Router) { }
 
@@ -58,7 +64,8 @@ export class AnalyticsDashboardComponent implements OnInit {
         if (this.selectedTestIds.length === 0) return;
         this.loading = true;
         this.error = '';
-        this.api.get('admin/analytics?testIds=' + this.selectedTestIds.join(',')).subscribe({
+        const url = `admin/analytics?testIds=${this.selectedTestIds.join(',')}&cutoff=${this.cutoff}`;
+        this.api.get(url).subscribe({
             next: (data: any) => {
                 this.analytics = data;
                 this.loading = false;
@@ -70,10 +77,33 @@ export class AnalyticsDashboardComponent implements OnInit {
         });
     }
 
+    // Cut-off editing
+    startEditCutoff() {
+        this.cutoffDraft = this.cutoff;
+        this.editingCutoff = true;
+    }
+
+    saveCutoff() {
+        const val = Math.min(100, Math.max(1, Math.round(this.cutoffDraft)));
+        this.cutoff = val;
+        this.cutoffDraft = val;
+        this.editingCutoff = false;
+        // Re-run analytics with new cutoff if data already loaded
+        if (this.analytics && this.selectedTestIds.length > 0) {
+            this.loadAnalytics();
+        }
+    }
+
+    cancelCutoff() {
+        this.cutoffDraft = this.cutoff;
+        this.editingCutoff = false;
+    }
+
     toggleExpandedTest(id: string) {
         this.expandedTestId = this.expandedTestId === id ? null : id;
     }
 
+    // ── Chart helpers ──
     getPassPercent(): number {
         if (!this.analytics?.summary?.totalAttempts) return 0;
         return Math.round((this.analytics.summary.passCount / this.analytics.summary.totalAttempts) * 100);
