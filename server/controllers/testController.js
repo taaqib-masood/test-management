@@ -1,7 +1,3 @@
-// ==============================
-// server/controllers/testController.js
-// ==============================
-
 const Test = require('../models/Test');
 const Question = require('../models/Question');
 const Attempt = require('../models/Attempt');
@@ -241,7 +237,6 @@ const getTestQuestions = async (req, res) => {
       if (test.shuffleOptions && qObj.options && Array.isArray(qObj.options)) {
         qObj.options = [...qObj.options].sort(() => Math.random() - 0.5);
       }
-      // Remove correct answer before sending to student
       delete qObj.correctAnswer;
       return qObj;
     });
