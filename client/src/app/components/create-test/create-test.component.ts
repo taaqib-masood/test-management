@@ -23,9 +23,7 @@ export class CreateTestComponent implements OnInit {
         allowMultipleAttempts: true,
         expiryDate: '',
         useExpiry: false,
-        selectedQuestions: [] as string[],
-        tabSwitchLimit: 3,
-        useTabLimit: true,
+        selectedQuestions: [] as string[]
     };
 
     difficultyMode: 'manual' | 'auto' = 'auto';
@@ -33,9 +31,16 @@ export class CreateTestComponent implements OnInit {
     mediumPercent = 40;
     hardPercent = 30;
 
-    selectedCategory = '';
+    // Multi-category — shared between auto and manual modes
     selectedCategories: string[] = [];
     categories: string[] = [];
+
+    // Tab switch mode:
+    //   'off'   = no restriction
+    //   'limit' = auto-submit after N switches
+    //   'block' = prevent switching entirely (no submit, just blocked)
+    tabSwitchMode: 'off' | 'limit' | 'block' = 'limit';
+    tabSwitchLimit: number = 3;
 
     isLoading = false;
     availableQuestions: any[] = [];
@@ -77,14 +82,12 @@ export class CreateTestComponent implements OnInit {
         this.hardCount = this.availableQuestions.filter((q: any) => q.difficulty === 'hard').length;
     }
 
+    // Multi-category toggle — works for both auto and manual modes
     toggleCategory(cat: string) {
         const idx = this.selectedCategories.indexOf(cat);
-        if (idx > -1) {
-            this.selectedCategories.splice(idx, 1);
-        } else {
-            this.selectedCategories.push(cat);
-        }
-        this.filterByCategories();
+        if (idx > -1) this.selectedCategories.splice(idx, 1);
+        else this.selectedCategories.push(cat);
+        this.applyCategories();
     }
 
     isCategorySelected(cat: string): boolean {
@@ -96,7 +99,7 @@ export class CreateTestComponent implements OnInit {
         this.filteredQuestions = [...this.availableQuestions];
     }
 
-    filterByCategories() {
+    applyCategories() {
         if (this.selectedCategories.length === 0) {
             this.filteredQuestions = [...this.availableQuestions];
         } else {
@@ -106,25 +109,13 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
-    filterByCategory() {
-        if (this.selectedCategory) {
-            this.filteredQuestions = this.availableQuestions.filter(
-                (q: any) => q.category === this.selectedCategory
-            );
-        } else {
-            this.filteredQuestions = [...this.availableQuestions];
-        }
-    }
-
     autoSelectQuestions() {
         const total = this.test.totalQuestions;
         const easyNeeded = Math.round((this.easyPercent / 100) * total);
         const hardNeeded = Math.round((this.hardPercent / 100) * total);
         const mediumNeeded = total - easyNeeded - hardNeeded;
 
-        const pool = this.selectedCategories.length > 0
-            ? this.availableQuestions.filter((q: any) => this.selectedCategories.includes(q.category || 'General'))
-            : [...this.availableQuestions];
+        const pool = this.filteredQuestions;
 
         const easyPool = this.shuffle(pool.filter((q: any) => q.difficulty === 'easy'));
         const mediumPool = this.shuffle(pool.filter((q: any) => q.difficulty === 'medium'));
@@ -137,8 +128,7 @@ export class CreateTestComponent implements OnInit {
 
         if (selected.length < total) {
             const remaining = pool.filter((q: any) => !selected.includes(q._id));
-            const needed = total - selected.length;
-            selected.push(...this.shuffle(remaining).slice(0, needed).map((q: any) => q._id));
+            selected.push(...this.shuffle(remaining).slice(0, total - selected.length).map((q: any) => q._id));
         }
 
         this.test.selectedQuestions = selected;
@@ -194,6 +184,16 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
+    // Resolves to value sent to backend:
+    //   -1 = block completely
+    //    0 = off (unlimited)
+    //    N = auto-submit after N switches
+    get resolvedTabSwitchLimit(): number {
+        if (this.tabSwitchMode === 'off') return 0;
+        if (this.tabSwitchMode === 'block') return -1;
+        return Math.max(1, this.tabSwitchLimit);
+    }
+
     onSubmit() {
         if (this.test.selectedQuestions.length === 0) {
             alert('Please select at least one question');
@@ -212,7 +212,7 @@ export class CreateTestComponent implements OnInit {
             questions: this.test.selectedQuestions,
             accessCode: this.test.useAccessCode ? this.test.accessCode : '',
             expiryDate: this.test.useExpiry ? this.test.expiryDate : null,
-            tabSwitchLimit: this.test.useTabLimit ? this.test.tabSwitchLimit : 0,
+            tabSwitchLimit: this.resolvedTabSwitchLimit
         };
 
         this.api.post('tests', payload).subscribe({
