@@ -62,18 +62,23 @@ router.get('/tests/:testId/results', protect, admin, async (req, res) => {
   }
 });
 
-// GET /api/admin/analytics?testIds=id1,id2,id3
+// GET /api/admin/analytics?testIds=id1,id2&cutoff=60
 router.get('/analytics', protect, admin, async (req, res) => {
   try {
-    let { testIds } = req.query;
-    let testIdArray = [];
+    let { testIds, cutoff } = req.query;
 
+    // Parse cutoff — default 60, clamp 1–100
+    const cutoffPct = Math.min(100, Math.max(1, parseFloat(cutoff) || 60));
+    const cutoffRatio = cutoffPct / 100;
+
+    let testIdArray = [];
     if (testIds) {
       testIdArray = Array.isArray(testIds)
         ? testIds
         : testIds.split(',').map(id => id.trim()).filter(Boolean);
     }
 
+    // No testIds — return all tests for the selector
     if (testIdArray.length === 0) {
       const allTests = await Test.find({}, '_id title createdAt').sort({ createdAt: -1 });
       return res.json({ tests: allTests, analytics: null });
@@ -87,7 +92,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
     const totalAttempts = attempts.length;
     const uniqueStudents = [...new Set(attempts.map(a => a.studentEmail))].length;
     const passCount = attempts.filter(a =>
-      a.totalQuestions > 0 && (a.score / a.totalQuestions) >= 0.6
+      a.totalQuestions > 0 && (a.score / a.totalQuestions) >= cutoffRatio
     ).length;
     const failCount = totalAttempts - passCount;
     const avgScore = totalAttempts > 0
@@ -113,7 +118,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
       count
     }));
 
-    // ── Performance over time (daily avg score) ──
+    // ── Performance over time (daily) ──
     const timeMap = {};
     attempts.forEach(a => {
       if (!a.endTime) return;
@@ -121,7 +126,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
       if (!timeMap[dateKey]) timeMap[dateKey] = { date: dateKey, count: 0, totalPct: 0, passCount: 0 };
       timeMap[dateKey].count++;
       timeMap[dateKey].totalPct += a.totalQuestions > 0 ? (a.score / a.totalQuestions) * 100 : 0;
-      if (a.totalQuestions > 0 && (a.score / a.totalQuestions) >= 0.6) timeMap[dateKey].passCount++;
+      if (a.totalQuestions > 0 && (a.score / a.totalQuestions) >= cutoffRatio) timeMap[dateKey].passCount++;
     });
     const performanceOverTime = Object.values(timeMap)
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -137,7 +142,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
       const testAttempts = attempts.filter(a => a.test.toString() === test._id.toString());
       const tCount = testAttempts.length;
       const tPass = testAttempts.filter(a =>
-        a.totalQuestions > 0 && (a.score / a.totalQuestions) >= 0.6
+        a.totalQuestions > 0 && (a.score / a.totalQuestions) >= cutoffRatio
       ).length;
       const tAvg = tCount > 0
         ? parseFloat((testAttempts.reduce((s, a) =>
@@ -145,7 +150,6 @@ router.get('/analytics', protect, admin, async (req, res) => {
           ) / tCount).toFixed(1))
         : 0;
 
-      // Per-question stats
       const questions = (test.questions || []).map(q => {
         let correct = 0, total = 0, timeSum = 0;
         testAttempts.forEach(attempt => {
@@ -171,7 +175,7 @@ router.get('/analytics', protect, admin, async (req, res) => {
         };
       });
 
-      // Difficulty heatmap: 3 rows (easy/medium/hard) x 5 cols (0-20,21-40,41-60,61-80,81-100)
+      // Difficulty heatmap: 3 rows x 5 cols
       const heatmapDifficulties = ['easy', 'medium', 'hard'];
       const heatmapGrid = heatmapDifficulties.map(diff => {
         const diffQs = questions.filter(q => q.difficulty === diff);
