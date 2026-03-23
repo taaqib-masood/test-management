@@ -24,11 +24,8 @@ export class CreateTestComponent implements OnInit {
         expiryDate: '',
         useExpiry: false,
         selectedQuestions: [] as string[],
-        // ✅ NEW: tab switch limit
         tabSwitchLimit: 3,
         useTabLimit: true,
-        // ✅ NEW: invite emails
-        inviteEmailsRaw: '',   // raw textarea input — comma/newline separated
     };
 
     difficultyMode: 'manual' | 'auto' = 'auto';
@@ -37,7 +34,6 @@ export class CreateTestComponent implements OnInit {
     hardPercent = 30;
 
     selectedCategory = '';
-    // ✅ CHANGED: selectedCategories is now an array for multi-select
     selectedCategories: string[] = [];
     categories: string[] = [];
 
@@ -50,9 +46,6 @@ export class CreateTestComponent implements OnInit {
     easyCount = 0;
     mediumCount = 0;
     hardCount = 0;
-
-    // ✅ NEW: email sending state after creation
-    emailResult: any = null;
 
     constructor(private api: ApiService, private router: Router) { }
 
@@ -84,7 +77,6 @@ export class CreateTestComponent implements OnInit {
         this.hardCount = this.availableQuestions.filter((q: any) => q.difficulty === 'hard').length;
     }
 
-    // ✅ CHANGED: multi-category toggle
     toggleCategory(cat: string) {
         const idx = this.selectedCategories.indexOf(cat);
         if (idx > -1) {
@@ -114,7 +106,6 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
-    // Legacy single-category for backward compat (used in manual mode dropdown)
     filterByCategory() {
         if (this.selectedCategory) {
             this.filteredQuestions = this.availableQuestions.filter(
@@ -131,7 +122,6 @@ export class CreateTestComponent implements OnInit {
         const hardNeeded = Math.round((this.hardPercent / 100) * total);
         const mediumNeeded = total - easyNeeded - hardNeeded;
 
-        // ✅ CHANGED: filter from multi-selected categories
         const pool = this.selectedCategories.length > 0
             ? this.availableQuestions.filter((q: any) => this.selectedCategories.includes(q.category || 'General'))
             : [...this.availableQuestions];
@@ -204,15 +194,6 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
-    // ✅ NEW: parse raw email textarea into a clean array
-    get parsedEmails(): string[] {
-        if (!this.test.inviteEmailsRaw.trim()) return [];
-        return this.test.inviteEmailsRaw
-            .split(/[\n,]+/)
-            .map(e => e.trim().toLowerCase())
-            .filter(e => e.includes('@'));
-    }
-
     onSubmit() {
         if (this.test.selectedQuestions.length === 0) {
             alert('Please select at least one question');
@@ -231,17 +212,13 @@ export class CreateTestComponent implements OnInit {
             questions: this.test.selectedQuestions,
             accessCode: this.test.useAccessCode ? this.test.accessCode : '',
             expiryDate: this.test.useExpiry ? this.test.expiryDate : null,
-            // ✅ NEW: tab switch limit (0 = unlimited/disabled)
             tabSwitchLimit: this.test.useTabLimit ? this.test.tabSwitchLimit : 0,
-            // ✅ NEW: invite emails
-            inviteEmails: this.parsedEmails.length > 0 ? this.parsedEmails : undefined
         };
 
         this.api.post('tests', payload).subscribe({
             next: (data) => {
                 this.isLoading = false;
                 this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
-                this.emailResult = data.emailResult || null;
             },
             error: () => {
                 this.isLoading = false;
