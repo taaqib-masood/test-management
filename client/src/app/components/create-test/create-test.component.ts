@@ -23,7 +23,12 @@ export class CreateTestComponent implements OnInit {
         allowMultipleAttempts: true,
         expiryDate: '',
         useExpiry: false,
-        selectedQuestions: [] as string[]
+        selectedQuestions: [] as string[],
+        // ✅ NEW: tab switch limit
+        tabSwitchLimit: 3,
+        useTabLimit: true,
+        // ✅ NEW: invite emails
+        inviteEmailsRaw: '',   // raw textarea input — comma/newline separated
     };
 
     difficultyMode: 'manual' | 'auto' = 'auto';
@@ -32,6 +37,8 @@ export class CreateTestComponent implements OnInit {
     hardPercent = 30;
 
     selectedCategory = '';
+    // ✅ CHANGED: selectedCategories is now an array for multi-select
+    selectedCategories: string[] = [];
     categories: string[] = [];
 
     isLoading = false;
@@ -39,11 +46,13 @@ export class CreateTestComponent implements OnInit {
     filteredQuestions: any[] = [];
     questionsLoading = true;
     createdLink = '';
-    createError = '';
 
     easyCount = 0;
     mediumCount = 0;
     hardCount = 0;
+
+    // ✅ NEW: email sending state after creation
+    emailResult: any = null;
 
     constructor(private api: ApiService, private router: Router) { }
 
@@ -75,6 +84,37 @@ export class CreateTestComponent implements OnInit {
         this.hardCount = this.availableQuestions.filter((q: any) => q.difficulty === 'hard').length;
     }
 
+    // ✅ CHANGED: multi-category toggle
+    toggleCategory(cat: string) {
+        const idx = this.selectedCategories.indexOf(cat);
+        if (idx > -1) {
+            this.selectedCategories.splice(idx, 1);
+        } else {
+            this.selectedCategories.push(cat);
+        }
+        this.filterByCategories();
+    }
+
+    isCategorySelected(cat: string): boolean {
+        return this.selectedCategories.includes(cat);
+    }
+
+    clearCategories() {
+        this.selectedCategories = [];
+        this.filteredQuestions = [...this.availableQuestions];
+    }
+
+    filterByCategories() {
+        if (this.selectedCategories.length === 0) {
+            this.filteredQuestions = [...this.availableQuestions];
+        } else {
+            this.filteredQuestions = this.availableQuestions.filter(
+                (q: any) => this.selectedCategories.includes(q.category || 'General')
+            );
+        }
+    }
+
+    // Legacy single-category for backward compat (used in manual mode dropdown)
     filterByCategory() {
         if (this.selectedCategory) {
             this.filteredQuestions = this.availableQuestions.filter(
@@ -91,8 +131,9 @@ export class CreateTestComponent implements OnInit {
         const hardNeeded = Math.round((this.hardPercent / 100) * total);
         const mediumNeeded = total - easyNeeded - hardNeeded;
 
-        const pool = this.selectedCategory
-            ? this.availableQuestions.filter((q: any) => q.category === this.selectedCategory)
+        // ✅ CHANGED: filter from multi-selected categories
+        const pool = this.selectedCategories.length > 0
+            ? this.availableQuestions.filter((q: any) => this.selectedCategories.includes(q.category || 'General'))
             : [...this.availableQuestions];
 
         const easyPool = this.shuffle(pool.filter((q: any) => q.difficulty === 'easy'));
@@ -126,13 +167,9 @@ export class CreateTestComponent implements OnInit {
         const total = this.easyPercent + this.mediumPercent + this.hardPercent;
         if (total !== 100) {
             const diff = total - 100;
-            if (changed === 'easy') {
-                this.mediumPercent = Math.max(0, this.mediumPercent - diff);
-            } else if (changed === 'hard') {
-                this.mediumPercent = Math.max(0, this.mediumPercent - diff);
-            } else {
-                this.hardPercent = Math.max(0, this.hardPercent - diff);
-            }
+            if (changed === 'easy') this.mediumPercent = Math.max(0, this.mediumPercent - diff);
+            else if (changed === 'hard') this.mediumPercent = Math.max(0, this.mediumPercent - diff);
+            else this.hardPercent = Math.max(0, this.hardPercent - diff);
         }
     }
 
@@ -142,11 +179,8 @@ export class CreateTestComponent implements OnInit {
 
     toggleQuestion(id: string) {
         const idx = this.test.selectedQuestions.indexOf(id);
-        if (idx > -1) {
-            this.test.selectedQuestions.splice(idx, 1);
-        } else {
-            this.test.selectedQuestions.push(id);
-        }
+        if (idx > -1) this.test.selectedQuestions.splice(idx, 1);
+        else this.test.selectedQuestions.push(id);
     }
 
     isSelected(id: string): boolean {
@@ -170,50 +204,48 @@ export class CreateTestComponent implements OnInit {
         }
     }
 
+    // ✅ NEW: parse raw email textarea into a clean array
+    get parsedEmails(): string[] {
+        if (!this.test.inviteEmailsRaw.trim()) return [];
+        return this.test.inviteEmailsRaw
+            .split(/[\n,]+/)
+            .map(e => e.trim().toLowerCase())
+            .filter(e => e.includes('@'));
+    }
+
     onSubmit() {
-        if (!this.test.title.trim()) {
-            alert('Please enter a test title');
-            return;
-        }
         if (this.test.selectedQuestions.length === 0) {
             alert('Please select at least one question');
             return;
         }
-
         this.isLoading = true;
-        this.createError = '';
 
-        // ✅ FIX: Send ONLY the fields the backend schema expects.
-        // Do NOT spread this.test — it contains UI-only fields like
-        // selectedQuestions, useAccessCode, useExpiry that break the backend.
-        const payload = {
-            title: this.test.title.trim(),
+        const payload: any = {
+            title: this.test.title,
             duration: this.test.duration,
+            totalQuestions: this.test.selectedQuestions.length,
             shuffleQuestions: this.test.shuffleQuestions,
             shuffleOptions: this.test.shuffleOptions,
             showResults: this.test.showResults,
             allowMultipleAttempts: this.test.allowMultipleAttempts,
-            accessCode: this.test.useAccessCode ? this.test.accessCode.trim() : null,
+            questions: this.test.selectedQuestions,
+            accessCode: this.test.useAccessCode ? this.test.accessCode : '',
             expiryDate: this.test.useExpiry ? this.test.expiryDate : null,
-            // ✅ FIX: backend expects 'questions' (array of IDs), not 'selectedQuestions'
-            questions: this.test.selectedQuestions
+            // ✅ NEW: tab switch limit (0 = unlimited/disabled)
+            tabSwitchLimit: this.test.useTabLimit ? this.test.tabSwitchLimit : 0,
+            // ✅ NEW: invite emails
+            inviteEmails: this.parsedEmails.length > 0 ? this.parsedEmails : undefined
         };
 
         this.api.post('tests', payload).subscribe({
-            next: (data: any) => {
+            next: (data) => {
                 this.isLoading = false;
-                if (data.uniqueLink) {
-                    this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
-                } else {
-                    // Fallback: show dashboard if link missing
-                    this.createError = 'Test created but link generation failed. Check the dashboard.';
-                }
+                this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
+                this.emailResult = data.emailResult || null;
             },
-            error: (err: any) => {
+            error: () => {
                 this.isLoading = false;
-                const msg = err?.error?.message || 'Failed to create test. Please try again.';
-                this.createError = msg;
-                alert(msg);
+                alert('Failed to create test');
             }
         });
     }
