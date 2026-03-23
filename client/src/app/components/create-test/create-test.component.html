@@ -22,6 +22,22 @@
                 <button (click)="copyLink()" class="btn btn-primary btn-sm" style="flex-shrink:0;">Copy</button>
             </div>
 
+            <!-- ✅ Email result feedback -->
+            <div *ngIf="emailResult && !emailResult.error" class="mt-6"
+                style="max-width:500px; margin:24px auto 0;">
+                <div *ngIf="emailResult.sent?.length > 0" class="alert alert-success mb-3">
+                    ✅ Invites sent to {{ emailResult.sent.length }} recipient(s)
+                </div>
+                <div *ngIf="emailResult.failed?.length > 0" class="alert alert-error">
+                    ⚠️ Failed to send to {{ emailResult.failed.length }} recipient(s):
+                    {{ emailResult.failed.map((f: any) => f.email).join(', ') }}
+                </div>
+            </div>
+            <div *ngIf="emailResult?.error" class="alert alert-error mt-4"
+                style="max-width:500px; margin:16px auto 0;">
+                ⚠️ Email service error: {{ emailResult.error }}
+            </div>
+
             <button (click)="goToDashboard()" class="btn btn-ghost mt-8">← Back to Dashboard</button>
         </div>
 
@@ -37,28 +53,24 @@
 
                     <!-- Basic Info -->
                     <div>
-                        <label class="text-sm font-semibold text-dark" style="display:block; margin-bottom:8px;">Test
-                            Title</label>
+                        <label class="text-sm font-semibold text-dark" style="display:block; margin-bottom:8px;">Test Title</label>
                         <input [(ngModel)]="test.title" name="title" type="text" required class="glass-input"
                             placeholder="e.g. Docker Fundamentals Quiz" />
                     </div>
 
                     <div class="grid grid-2 gap-8">
                         <div>
-                            <label class="text-sm font-semibold text-dark"
-                                style="display:block; margin-bottom:8px;">Duration (minutes)</label>
-                            <input [(ngModel)]="test.duration" name="duration" type="number" required min="1"
-                                class="glass-input" />
+                            <label class="text-sm font-semibold text-dark" style="display:block; margin-bottom:8px;">Duration (minutes)</label>
+                            <input [(ngModel)]="test.duration" name="duration" type="number" required min="1" class="glass-input" />
                         </div>
                         <div>
-                            <label class="text-sm font-semibold text-dark"
-                                style="display:block; margin-bottom:8px;">Number of Questions</label>
-                            <input [(ngModel)]="test.totalQuestions" name="totalQuestions" type="number" required
-                                min="1" [max]="availableQuestions.length" class="glass-input" />
+                            <label class="text-sm font-semibold text-dark" style="display:block; margin-bottom:8px;">Number of Questions</label>
+                            <input [(ngModel)]="test.totalQuestions" name="totalQuestions" type="number" required min="1"
+                                [max]="availableQuestions.length" class="glass-input" />
                         </div>
                     </div>
 
-                    <!-- Access Code Toggle -->
+                    <!-- Access Code -->
                     <div style="background:rgba(248,250,252,0.6); border-radius:var(--radius-md); padding:18px;">
                         <label class="checkbox-wrap mb-2">
                             <input [(ngModel)]="test.useAccessCode" name="useAccessCode" type="checkbox" />
@@ -70,7 +82,32 @@
                         </div>
                     </div>
 
-                    <!-- Options Toggle -->
+                    <!-- ✅ NEW: Tab Switch Limit -->
+                    <div style="background:rgba(255,251,235,0.7); border:1px solid #fde68a; border-radius:var(--radius-md); padding:18px;">
+                        <label class="checkbox-wrap mb-3">
+                            <input [(ngModel)]="test.useTabLimit" name="useTabLimit" type="checkbox" />
+                            <span class="text-sm font-bold text-dark">🚫 Limit Tab Switches</span>
+                        </label>
+                        <div *ngIf="test.useTabLimit" style="display:flex; align-items:center; gap:16px; margin-top:8px;">
+                            <div style="flex:1;">
+                                <label class="text-xs font-semibold text-mid" style="display:block; margin-bottom:6px;">
+                                    Max tab switches before auto-submit
+                                </label>
+                                <input [(ngModel)]="test.tabSwitchLimit" name="tabSwitchLimit"
+                                    type="number" min="1" max="20" class="glass-input"
+                                    style="max-width:120px;" />
+                            </div>
+                            <p class="text-xs text-mid" style="max-width:260px; margin-top:16px;">
+                                The test will be <strong>auto-submitted</strong> when the student switches tabs
+                                more than {{ test.tabSwitchLimit }} time(s). A warning is shown on each switch.
+                            </p>
+                        </div>
+                        <p *ngIf="!test.useTabLimit" class="text-xs text-mid mt-2">
+                            Tab switches will be tracked but the test won't be auto-submitted.
+                        </p>
+                    </div>
+
+                    <!-- Options -->
                     <div style="display:flex; flex-direction:column; gap:14px; padding-top:4px;">
                         <label class="checkbox-wrap">
                             <input [(ngModel)]="test.shuffleQuestions" name="shuffleQuestions" type="checkbox" />
@@ -82,24 +119,16 @@
                         </label>
                         <label class="checkbox-wrap">
                             <input [(ngModel)]="test.showResults" name="showResults" type="checkbox" />
-                            <span class="text-sm font-medium text-dark">Allow students to see their results after
-                                submission</span>
+                            <span class="text-sm font-medium text-dark">Allow students to see their results after submission</span>
                         </label>
                     </div>
 
-                    <!-- Single Attempt & Expiry Section -->
-                    <div
-                        style="background:rgba(248,250,252,0.6); border-radius:var(--radius-md); padding:18px; display:flex; flex-direction:column; gap:16px;">
+                    <!-- Single Attempt & Expiry -->
+                    <div style="background:rgba(248,250,252,0.6); border-radius:var(--radius-md); padding:18px; display:flex; flex-direction:column; gap:16px;">
                         <label class="checkbox-wrap">
-                            <input [(ngModel)]="test.allowMultipleAttempts" name="allowMultipleAttempts"
-                                type="checkbox" />
+                            <input [(ngModel)]="test.allowMultipleAttempts" name="allowMultipleAttempts" type="checkbox" />
                             <span class="text-sm font-bold text-dark">🔄 Allow Multiple Attempts</span>
                         </label>
-                        <p *ngIf="!test.allowMultipleAttempts" class="text-xs text-mid"
-                            style="margin-left:28px; margin-top:-8px;">
-                            Each student email can only take this test once. Duplicate attempts will be blocked.
-                        </p>
-
                         <label class="checkbox-wrap">
                             <input [(ngModel)]="test.useExpiry" name="useExpiry" type="checkbox" />
                             <span class="text-sm font-bold text-dark">⏰ Set Expiry Date</span>
@@ -107,8 +136,6 @@
                         <div *ngIf="test.useExpiry" style="margin-left:28px;">
                             <input [(ngModel)]="test.expiryDate" name="expiryDate" type="datetime-local"
                                 class="glass-input" style="max-width:320px;" />
-                            <p class="text-xs text-mid mt-2">Students won't be able to access the test after this date.
-                            </p>
                         </div>
                     </div>
 
@@ -118,77 +145,84 @@
                             <h3 class="font-bold text-dark text-base">📊 Difficulty Distribution</h3>
                             <div class="flex gap-2">
                                 <button type="button" (click)="difficultyMode = 'auto'" class="btn btn-sm"
-                                    [ngClass]="difficultyMode === 'auto' ? 'btn-primary' : 'btn-ghost'">
-                                    Auto Select
-                                </button>
+                                    [ngClass]="difficultyMode === 'auto' ? 'btn-primary' : 'btn-ghost'">Auto Select</button>
                                 <button type="button" (click)="difficultyMode = 'manual'" class="btn btn-sm"
-                                    [ngClass]="difficultyMode === 'manual' ? 'btn-primary' : 'btn-ghost'">
-                                    Manual Pick
-                                </button>
+                                    [ngClass]="difficultyMode === 'manual' ? 'btn-primary' : 'btn-ghost'">Manual Pick</button>
                             </div>
                         </div>
 
-                        <!-- Question Bank Stats -->
+                        <!-- Question bank stats -->
                         <div class="flex gap-4 mb-6 flex-wrap">
                             <div class="flex items-center gap-2">
-                                <span
-                                    style="width:10px; height:10px; border-radius:50%; background:#22c55e; display:inline-block;"></span>
-                                <span class="text-sm text-mid">Easy: <strong class="text-dark">{{ easyCount
-                                        }}</strong></span>
+                                <span style="width:10px; height:10px; border-radius:50%; background:#22c55e; display:inline-block;"></span>
+                                <span class="text-sm text-mid">Easy: <strong class="text-dark">{{ easyCount }}</strong></span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span
-                                    style="width:10px; height:10px; border-radius:50%; background:#f59e0b; display:inline-block;"></span>
-                                <span class="text-sm text-mid">Medium: <strong class="text-dark">{{ mediumCount
-                                        }}</strong></span>
+                                <span style="width:10px; height:10px; border-radius:50%; background:#f59e0b; display:inline-block;"></span>
+                                <span class="text-sm text-mid">Medium: <strong class="text-dark">{{ mediumCount }}</strong></span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span
-                                    style="width:10px; height:10px; border-radius:50%; background:#ef4444; display:inline-block;"></span>
-                                <span class="text-sm text-mid">Hard: <strong class="text-dark">{{ hardCount
-                                        }}</strong></span>
+                                <span style="width:10px; height:10px; border-radius:50%; background:#ef4444; display:inline-block;"></span>
+                                <span class="text-sm text-mid">Hard: <strong class="text-dark">{{ hardCount }}</strong></span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <span class="text-sm text-mid">Total: <strong class="text-dark">{{
-                                        availableQuestions.length }}</strong></span>
+                                <span class="text-sm text-mid">Total: <strong class="text-dark">{{ availableQuestions.length }}</strong></span>
                             </div>
                         </div>
 
-                        <!-- Auto Mode: Percentage Sliders -->
+                        <!-- AUTO MODE -->
                         <div *ngIf="difficultyMode === 'auto'">
 
-                            <!-- Category Filter -->
+                            <!-- ✅ CHANGED: Multi-category selector -->
                             <div class="mb-6">
-                                <label class="text-xs font-semibold text-mid uppercase tracking-wider"
-                                    style="display:block; margin-bottom:6px;">Filter by Category</label>
-                                <select [(ngModel)]="selectedCategory" name="category" class="glass-input"
-                                    (ngModelChange)="filterByCategory()">
-                                    <option value="">All Categories</option>
-                                    <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
-                                </select>
+                                <div class="flex-between mb-2">
+                                    <label class="text-xs font-semibold text-mid uppercase tracking-wider">
+                                        Filter by Category (select multiple)
+                                    </label>
+                                    <button *ngIf="selectedCategories.length > 0" type="button"
+                                        (click)="clearCategories()" class="text-xs text-primary"
+                                        style="background:none; border:none; cursor:pointer; text-decoration:underline;">
+                                        Clear all
+                                    </button>
+                                </div>
+                                <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                                    <button *ngFor="let cat of categories" type="button"
+                                        (click)="toggleCategory(cat)"
+                                        class="btn btn-sm"
+                                        [style.background]="isCategorySelected(cat) ? 'var(--primary)' : 'white'"
+                                        [style.color]="isCategorySelected(cat) ? 'white' : 'var(--text-mid)'"
+                                        [style.border]="isCategorySelected(cat) ? '1.5px solid var(--primary)' : '1.5px solid #e2e8f0'">
+                                        {{ cat }}
+                                        <span *ngIf="isCategorySelected(cat)" style="margin-left:4px;">✓</span>
+                                    </button>
+                                </div>
+                                <p *ngIf="selectedCategories.length > 0" class="text-xs text-primary mt-2 font-semibold">
+                                    {{ selectedCategories.length }} category(s) selected —
+                                    {{ filteredQuestions.length }} questions in pool
+                                </p>
+                                <p *ngIf="selectedCategories.length === 0" class="text-xs text-mid mt-2">
+                                    No filter — all {{ availableQuestions.length }} questions in pool
+                                </p>
                             </div>
 
                             <div class="grid grid-3 gap-6 mb-6">
                                 <div>
                                     <label class="text-xs font-semibold uppercase tracking-wider"
-                                        style="color:#22c55e; display:block; margin-bottom:6px;">
-                                        Easy %</label>
+                                        style="color:#22c55e; display:block; margin-bottom:6px;">Easy %</label>
                                     <input [(ngModel)]="easyPercent" name="easyPercent" type="number" min="0" max="100"
                                         class="glass-input text-center font-bold" style="font-size:18px;"
                                         (ngModelChange)="adjustPercent('easy')" />
                                 </div>
                                 <div>
                                     <label class="text-xs font-semibold uppercase tracking-wider"
-                                        style="color:#f59e0b; display:block; margin-bottom:6px;">
-                                        Medium %</label>
-                                    <input [(ngModel)]="mediumPercent" name="mediumPercent" type="number" min="0"
-                                        max="100" class="glass-input text-center font-bold" style="font-size:18px;"
+                                        style="color:#f59e0b; display:block; margin-bottom:6px;">Medium %</label>
+                                    <input [(ngModel)]="mediumPercent" name="mediumPercent" type="number" min="0" max="100"
+                                        class="glass-input text-center font-bold" style="font-size:18px;"
                                         (ngModelChange)="adjustPercent('medium')" />
                                 </div>
                                 <div>
                                     <label class="text-xs font-semibold uppercase tracking-wider"
-                                        style="color:#ef4444; display:block; margin-bottom:6px;">
-                                        Hard %</label>
+                                        style="color:#ef4444; display:block; margin-bottom:6px;">Hard %</label>
                                     <input [(ngModel)]="hardPercent" name="hardPercent" type="number" min="0" max="100"
                                         class="glass-input text-center font-bold" style="font-size:18px;"
                                         (ngModelChange)="adjustPercent('hard')" />
@@ -212,7 +246,7 @@
                         </div>
                     </div>
 
-                    <!-- Manual Question Selection (shown in manual mode OR after auto-select for review) -->
+                    <!-- MANUAL MODE -->
                     <div *ngIf="difficultyMode === 'manual'">
                         <div class="flex-between mb-4">
                             <label class="text-sm font-semibold text-dark">
@@ -226,10 +260,8 @@
                                     <option value="">All Categories</option>
                                     <option *ngFor="let cat of categories" [value]="cat">{{ cat }}</option>
                                 </select>
-                                <button type="button" (click)="selectAll()" class="btn btn-ghost btn-sm">Select
-                                    All</button>
-                                <button type="button" (click)="deselectAll()" class="btn btn-ghost btn-sm">Deselect
-                                    All</button>
+                                <button type="button" (click)="selectAll()" class="btn btn-ghost btn-sm">Select All</button>
+                                <button type="button" (click)="deselectAll()" class="btn btn-ghost btn-sm">Deselect All</button>
                             </div>
                         </div>
 
@@ -246,16 +278,17 @@
 
                         <div *ngIf="!questionsLoading && filteredQuestions.length > 0"
                             style="max-height:400px; overflow-y:auto; border:1px solid #e2e8f0; border-radius:var(--radius-md);">
-                            <div *ngFor="let q of filteredQuestions; let i = index" (click)="toggleQuestion(q._id)"
-                                style="padding:14px 18px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:flex-start; gap:12px; transition: background 0.2s;"
+                            <div *ngFor="let q of filteredQuestions" (click)="toggleQuestion(q._id)"
+                                style="padding:14px 18px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:flex-start; gap:12px; transition:background 0.2s;"
                                 [style.background]="isSelected(q._id) ? 'rgba(238,242,255,0.6)' : 'transparent'">
                                 <input type="checkbox" [checked]="isSelected(q._id)"
-                                    style="margin-top:3px; accent-color:var(--primary);pointer-events:none;" />
+                                    style="margin-top:3px; accent-color:var(--primary); pointer-events:none;" />
                                 <div style="flex:1;">
                                     <span class="font-medium text-dark text-sm">{{ q.text }}</span>
                                     <div class="flex gap-2 mt-1">
                                         <span class="badge badge-primary">{{ q.type }}</span>
-                                        <span class="badge" [style.background]="getDifficultyColor(q.difficulty) + '20'"
+                                        <span class="badge"
+                                            [style.background]="getDifficultyColor(q.difficulty) + '20'"
                                             [style.color]="getDifficultyColor(q.difficulty)" style="font-size:11px;">
                                             {{ q.difficulty }}
                                         </span>
@@ -266,6 +299,30 @@
                         </div>
                     </div>
 
+                    <!-- ✅ NEW: Invite Emails -->
+                    <div style="background:rgba(240,253,244,0.7); border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:18px;">
+                        <h3 class="font-bold text-dark text-sm mb-3">📧 Send Invite Emails (Optional)</h3>
+                        <p class="text-xs text-mid mb-3">
+                            Enter email addresses to automatically send the test link when the test is created.
+                            Separate by commas or new lines.
+                        </p>
+                        <textarea
+                            [(ngModel)]="test.inviteEmailsRaw"
+                            name="inviteEmailsRaw"
+                            rows="4"
+                            class="glass-input"
+                            style="font-family:monospace; font-size:13px; resize:vertical;"
+                            placeholder="john@ltts.com, jane@ltts.com&#10;bob@ltts.com">
+                        </textarea>
+                        <p *ngIf="parsedEmails.length > 0" class="text-xs text-green font-semibold mt-2">
+                            ✅ {{ parsedEmails.length }} valid email(s) detected
+                        </p>
+                        <p class="text-xs text-light mt-1">
+                            ⚠️ Requires EMAIL_USER and EMAIL_PASS to be set in server .env
+                        </p>
+                    </div>
+
+                    <!-- Submit -->
                     <div style="padding-top:12px;">
                         <button type="submit" [disabled]="isLoading || test.selectedQuestions.length === 0"
                             class="btn btn-primary btn-full btn-lg">
