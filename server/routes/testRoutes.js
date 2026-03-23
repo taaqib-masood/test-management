@@ -14,52 +14,32 @@ const upload = multer({ storage });
 // ADMIN ROUTES (protected)
 // ==============================
 
-// Upload questions via Excel
 router.post('/upload-questions', protect, admin, upload.single('file'), testController.uploadQuestions);
-
-// Create questions manually (JSON array)
 router.post('/create-questions', protect, admin, testController.createQuestions);
-
-// Create a test
 router.post('/', protect, admin, testController.createTest);
-
-// Get all tests
 router.get('/', protect, admin, testController.getTests);
 
-// Get all questions (from Question collection)
-// IMPORTANT: Must come before /:id routes to avoid being swallowed
+// Static routes MUST come before /:id
 router.get('/questions/all', protect, admin, testController.getAllQuestions);
-
-// Delete all questions
 router.delete('/questions/all', protect, admin, testController.deleteAllQuestions);
-
-// Delete a single question by ID
 router.delete('/questions/:id', protect, admin, testController.deleteQuestion);
 
-// Toggle test active/inactive
+// Per-test admin actions
 router.put('/:id/toggle', protect, admin, testController.toggleTest);
-
-// Update (or remove) the access code for a test
 router.put('/:id/access-code', protect, admin, testController.updateAccessCode);
-
-// Link questions to a test by ID array
 router.post('/:id/add-questions', protect, admin, testController.addQuestionsToTest);
 
-// Delete a test
-router.delete('/:id', protect, admin, testController.deleteTest);
+// ✅ NEW: Send invite emails for a specific test
+router.post('/:id/send-invites', protect, admin, testController.sendInvites);
 
-// Get a single test (with questions) — admin
+router.delete('/:id', protect, admin, testController.deleteTest);
 router.get('/:id', protect, admin, testController.getTest);
 
 // ==============================
 // PUBLIC ROUTES (no auth)
 // ==============================
 
-// Get test info by unique shareable link (students)
 router.get('/link/:uniqueLink', testController.getTestByLink);
-
-// Get test questions for students (no correct answers)
-// Note: /:id/questions must come after /questions/all to avoid conflicts
 router.get('/:id/questions', testController.getTestQuestions);
 
 module.exports = router;
