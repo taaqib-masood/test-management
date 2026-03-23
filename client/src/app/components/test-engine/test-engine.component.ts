@@ -27,13 +27,15 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     questionTimes: { [key: string]: number } = {};
     questionStartTime: number = Date.now();
 
-    // ✅ ADD: loading and error states so template doesn't show blank silently
-    isLoading = true;
-    loadError = '';
-
     warnings = 0;
     tabSwitchCount = 0;
     showTabWarning = false;
+
+    // ✅ NEW: dynamic limit loaded from test config (default 3, 0 = unlimited)
+    tabSwitchLimit = 3;
+
+    isLoading = true;
+    loadError = '';
 
     private apiUrl = environment.apiUrl;
 
@@ -69,81 +71,60 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     loadAttemptAndQuestions() {
-        this.isLoading = true;
-        this.loadError = '';
-
-        // Step 1: fetch the attempt to get testId and startTime
         this.http.get(`${this.apiUrl}/attempts/${this.attemptId}`).subscribe({
             next: (attempt: any) => {
-
-                // ✅ FIX: handle both populated object and plain ObjectId string
-                this.testId = (attempt.test && typeof attempt.test === 'object')
-                    ? attempt.test._id
-                    : attempt.test;
-
-                if (!this.testId) {
-                    this.loadError = 'Could not determine test ID from attempt.';
-                    this.isLoading = false;
-                    return;
-                }
-
+                this.testId = attempt.test?._id || attempt.test;
                 const startTime = new Date(attempt.startTime).getTime();
 
-                // Restore tab switch count
+                if (attempt.answers && Array.isArray(attempt.answers)) {
+                    attempt.answers.forEach((ans: any) => {
+                        if (ans.timeSpent) this.questionTimes[ans.questionId] = ans.timeSpent;
+                    });
+                }
                 if (attempt.tabSwitchCount) {
                     this.tabSwitchCount = attempt.tabSwitchCount;
                     this.warnings = attempt.tabSwitchCount;
                 }
 
-                // Step 2: fetch questions for this test
                 this.http.get(`${this.apiUrl}/tests/${this.testId}/questions`).subscribe({
                     next: (data: any) => {
-                        this.testTitle = data.title || 'Assessment';
+                        this.testTitle = data.title;
+                        this.questions = (data.questions || []).filter((q: any) => q !== null);
+                        this.timeLeft = Math.max(0, (data.duration * 60) - Math.floor((Date.now() - startTime) / 1000));
 
-                        // ✅ FIX: guard against null/undefined questions array
-                        this.questions = Array.isArray(data.questions) ? data.questions.filter((q: any) => q !== null) : [];
+                        // ✅ NEW: load tabSwitchLimit from the test config
+                        if (data.tabSwitchLimit !== undefined) {
+                            this.tabSwitchLimit = data.tabSwitchLimit;
+                        }
 
                         if (this.questions.length === 0) {
-                            this.loadError = 'This test has no questions yet. Please contact your administrator.';
+                            this.loadError = 'This test has no questions yet.';
                             this.isLoading = false;
                             return;
                         }
 
-                        // Calculate remaining time accounting for time already elapsed
-                        const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-                        this.timeLeft = Math.max(0, (data.duration * 60) - elapsedSeconds);
-
-                        // Restore previously saved answers
                         if (attempt.answers && Array.isArray(attempt.answers)) {
                             attempt.answers.forEach((ans: any) => {
                                 const q = this.questions.find((q: any) => q._id === ans.questionId);
                                 if (q && q.options && ans.selectedOption) {
                                     const idx = q.options.indexOf(ans.selectedOption);
-                                    if (idx !== -1) {
-                                        this.answers[ans.questionId] = idx;
-                                    }
-                                }
-                                // Restore time spent per question
-                                if (ans.timeSpent) {
-                                    this.questionTimes[ans.questionId] = ans.timeSpent;
+                                    if (idx !== -1) this.answers[ans.questionId] = idx;
                                 }
                             });
                         }
 
-                        this.questionStartTime = Date.now();
                         this.isLoading = false;
+                        this.questionStartTime = Date.now();
                         this.startTimer();
                     },
-                    error: (err: any) => {
-                        console.error('Failed to load questions:', err);
+                    error: () => {
                         this.loadError = 'Failed to load questions. Please try again.';
                         this.isLoading = false;
                     }
                 });
             },
-            error: (err: any) => {
-                console.error('Failed to load attempt:', err);
-                this.loadError = 'Failed to load your session. Please start again.';
+            error: () => {
+                this.loadError = 'Failed to load attempt. Please try again.';
                 this.isLoading = false;
             }
         });
@@ -175,9 +156,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     }
 
     selectOption(index: number) {
-        if (this.currentQuestion) {
-            this.answers[this.currentQuestion._id] = index;
-        }
+        if (this.currentQuestion) this.answers[this.currentQuestion._id] = index;
     }
 
     getSelectedOption(): number | null {
@@ -190,34 +169,29 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
     nextQuestion() {
         this.trackQuestionTime();
-        if (this.currentQuestionIndex < this.questions.length - 1) {
-            this.currentQuestionIndex++;
-        }
+        if (this.currentQuestionIndex < this.questions.length - 1) this.currentQuestionIndex++;
     }
 
     prevQuestion() {
         this.trackQuestionTime();
-        if (this.currentQuestionIndex > 0) {
-            this.currentQuestionIndex--;
-        }
+        if (this.currentQuestionIndex > 0) this.currentQuestionIndex--;
     }
 
     saveProgress() {
-        if (!this.attemptId || this.questions.length === 0) return;
-        this.trackQuestionTime();
-        const formattedAnswers = this.formatAnswers();
-        this.http.put(`${this.apiUrl}/attempts/${this.attemptId}/save`, {
-            answers: formattedAnswers,
-            tabSwitchCount: this.tabSwitchCount
-        }).subscribe({
-            error: (err) => console.error('Auto-save failed:', err)
-        });
-        this.questionStartTime = Date.now();
+        if (this.attemptId) {
+            this.trackQuestionTime();
+            const formattedAnswers = this.formatAnswers();
+            this.http.put(`${this.apiUrl}/attempts/${this.attemptId}/save`, {
+                answers: formattedAnswers,
+                tabSwitchCount: this.tabSwitchCount
+            }).subscribe();
+            this.questionStartTime = Date.now();
+        }
     }
 
     private formatAnswers() {
         return Object.keys(this.answers).map(qId => {
-            const q = this.questions.find(fq => fq._id === qId);
+            const q = this.questions.find((fq: any) => fq._id === qId);
             return {
                 questionId: qId,
                 selectedOption: q ? q.options[this.answers[qId]] : null,
@@ -246,12 +220,8 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             answers: formattedAnswers,
             tabSwitchCount: this.tabSwitchCount
         }).subscribe({
-            next: () => {
-                this.router.navigate(['/result', this.attemptId]);
-            },
-            error: () => {
-                alert('Submission failed. Please try again.');
-            }
+            next: () => { this.router.navigate(['/result', this.attemptId]); },
+            error: () => { alert('Submission failed. Please try again.'); }
         });
     }
 
@@ -262,7 +232,9 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             this.tabSwitchCount++;
             this.showTabWarning = true;
             setTimeout(() => this.showTabWarning = false, 5000);
-            if (this.warnings >= 3) {
+
+            // ✅ CHANGED: use dynamic tabSwitchLimit (0 means unlimited — never auto-submit)
+            if (this.tabSwitchLimit > 0 && this.warnings >= this.tabSwitchLimit) {
                 this.autoSubmit();
             }
         }
