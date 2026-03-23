@@ -22,22 +22,6 @@
                 <button (click)="copyLink()" class="btn btn-primary btn-sm" style="flex-shrink:0;">Copy</button>
             </div>
 
-            <!-- ✅ Email result feedback -->
-            <div *ngIf="emailResult && !emailResult.error" class="mt-6"
-                style="max-width:500px; margin:24px auto 0;">
-                <div *ngIf="emailResult.sent?.length > 0" class="alert alert-success mb-3">
-                    ✅ Invites sent to {{ emailResult.sent.length }} recipient(s)
-                </div>
-                <div *ngIf="emailResult.failed?.length > 0" class="alert alert-error">
-                    ⚠️ Failed to send to {{ emailResult.failed.length }} recipient(s):
-                    {{ emailResult.failed.map((f: any) => f.email).join(', ') }}
-                </div>
-            </div>
-            <div *ngIf="emailResult?.error" class="alert alert-error mt-4"
-                style="max-width:500px; margin:16px auto 0;">
-                ⚠️ Email service error: {{ emailResult.error }}
-            </div>
-
             <button (click)="goToDashboard()" class="btn btn-ghost mt-8">← Back to Dashboard</button>
         </div>
 
@@ -82,7 +66,7 @@
                         </div>
                     </div>
 
-                    <!-- ✅ NEW: Tab Switch Limit -->
+                    <!-- Tab Switch Limit -->
                     <div style="background:rgba(255,251,235,0.7); border:1px solid #fde68a; border-radius:var(--radius-md); padding:18px;">
                         <label class="checkbox-wrap mb-3">
                             <input [(ngModel)]="test.useTabLimit" name="useTabLimit" type="checkbox" />
@@ -98,7 +82,7 @@
                                     style="max-width:120px;" />
                             </div>
                             <p class="text-xs text-mid" style="max-width:260px; margin-top:16px;">
-                                The test will be <strong>auto-submitted</strong> when the student switches tabs
+                                Test will be <strong>auto-submitted</strong> when the student switches tabs
                                 more than {{ test.tabSwitchLimit }} time(s). A warning is shown on each switch.
                             </p>
                         </div>
@@ -173,7 +157,7 @@
                         <!-- AUTO MODE -->
                         <div *ngIf="difficultyMode === 'auto'">
 
-                            <!-- ✅ CHANGED: Multi-category selector -->
+                            <!-- Multi-category selector -->
                             <div class="mb-6">
                                 <div class="flex-between mb-2">
                                     <label class="text-xs font-semibold text-mid uppercase tracking-wider">
@@ -297,29 +281,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    <!-- ✅ NEW: Invite Emails -->
-                    <div style="background:rgba(240,253,244,0.7); border:1px solid #bbf7d0; border-radius:var(--radius-md); padding:18px;">
-                        <h3 class="font-bold text-dark text-sm mb-3">📧 Send Invite Emails (Optional)</h3>
-                        <p class="text-xs text-mid mb-3">
-                            Enter email addresses to automatically send the test link when the test is created.
-                            Separate by commas or new lines.
-                        </p>
-                        <textarea
-                            [(ngModel)]="test.inviteEmailsRaw"
-                            name="inviteEmailsRaw"
-                            rows="4"
-                            class="glass-input"
-                            style="font-family:monospace; font-size:13px; resize:vertical;"
-                            placeholder="john@ltts.com, jane@ltts.com&#10;bob@ltts.com">
-                        </textarea>
-                        <p *ngIf="parsedEmails.length > 0" class="text-xs text-green font-semibold mt-2">
-                            ✅ {{ parsedEmails.length }} valid email(s) detected
-                        </p>
-                        <p class="text-xs text-light mt-1">
-                            ⚠️ Requires EMAIL_USER and EMAIL_PASS to be set in server .env
-                        </p>
                     </div>
 
                     <!-- Submit -->
