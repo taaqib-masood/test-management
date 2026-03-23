@@ -27,14 +27,18 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     questionTimes: { [key: string]: number } = {};
     questionStartTime: number = Date.now();
 
-    // Tab switch settings loaded from test
-    tabSwitchLimit = 3;   // -1 = block, 0 = off, N = limit
+    // -1 = block, 0 = off, N = limit+auto-submit
+    tabSwitchLimit = 3;
 
-    // Runtime tab switch state
     tabSwitchCount = 0;
     showTabWarning = false;
     tabWarningMessage = '';
-    isBlocked = false;    // true briefly when in block mode to show overlay
+
+    // Block mode state
+    showFullscreenPrompt = false;   // shown before test starts in block mode
+    showFullscreenWarning = false;  // shown when they exit fullscreen mid-test
+    fullscreenWarningTimeout: any = null;
+    isFullscreen = false;
 
     private apiUrl = environment.apiUrl;
 
@@ -46,12 +50,10 @@ export class TestEngineComponent implements OnInit, OnDestroy {
         return this.timeLeft;
     }
 
-    // Whether tab switching is completely blocked (no submit)
     get isBlockMode(): boolean {
         return this.tabSwitchLimit === -1;
     }
 
-    // Whether auto-submit after N switches
     get isLimitMode(): boolean {
         return this.tabSwitchLimit > 0;
     }
@@ -77,6 +79,10 @@ export class TestEngineComponent implements OnInit, OnDestroy {
         this.autoSaveSubscription = interval(10000).subscribe(() => {
             this.saveProgress();
         });
+
+        // Listen for fullscreen change events
+        document.addEventListener('fullscreenchange', this.onFullscreenChange.bind(this));
+        document.addEventListener('webkitfullscreenchange', this.onFullscreenChange.bind(this));
     }
 
     loadAttemptAndQuestions() {
@@ -99,8 +105,6 @@ export class TestEngineComponent implements OnInit, OnDestroy {
                         this.testTitle = data.title;
                         this.questions = data.questions;
                         this.timeLeft = Math.max(0, (data.duration * 60) - Math.floor((Date.now() - startTime) / 1000));
-
-                        // Load tabSwitchLimit from test (-1, 0, or N)
                         this.tabSwitchLimit = data.tabSwitchLimit !== undefined ? data.tabSwitchLimit : 3;
 
                         if (attempt.answers && Array.isArray(attempt.answers)) {
@@ -114,7 +118,13 @@ export class TestEngineComponent implements OnInit, OnDestroy {
                         }
 
                         this.questionStartTime = Date.now();
-                        this.startTimer();
+
+                        // If block mode, show the fullscreen prompt before starting timer
+                        if (this.isBlockMode) {
+                            this.showFullscreenPrompt = true;
+                        } else {
+                            this.startTimer();
+                        }
                     },
                     error: () => {
                         alert('Failed to load questions.');
@@ -127,6 +137,57 @@ export class TestEngineComponent implements OnInit, OnDestroy {
                 this.router.navigate(['/test', this.link]);
             }
         });
+    }
+
+    // Called when student clicks "Enter Fullscreen & Start" in block mode
+    enterFullscreenAndStart() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen().then(() => {
+                this.isFullscreen = true;
+                this.showFullscreenPrompt = false;
+                this.startTimer();
+            }).catch(() => {
+                // If fullscreen is denied, still allow test but warn
+                this.showFullscreenPrompt = false;
+                this.startTimer();
+            });
+        } else {
+            this.showFullscreenPrompt = false;
+            this.startTimer();
+        }
+    }
+
+    // Fires whenever fullscreen state changes
+    onFullscreenChange() {
+        const isNowFullscreen = !!(
+            document.fullscreenElement ||
+            (document as any).webkitFullscreenElement
+        );
+
+        this.isFullscreen = isNowFullscreen;
+
+        // Only act if block mode and they just EXITED fullscreen mid-test
+        if (this.isBlockMode && !isNowFullscreen && !this.showFullscreenPrompt && this.questions.length > 0) {
+            this.showFullscreenWarning = true;
+            clearTimeout(this.fullscreenWarningTimeout);
+            // Warning stays until they click "Return to fullscreen"
+        }
+    }
+
+    // Called when student clicks "Return to Fullscreen" on the warning screen
+    returnToFullscreen() {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+            el.requestFullscreen().then(() => {
+                this.isFullscreen = true;
+                this.showFullscreenWarning = false;
+            }).catch(() => {
+                this.showFullscreenWarning = false;
+            });
+        } else {
+            this.showFullscreenWarning = false;
+        }
     }
 
     startTimer() {
@@ -178,9 +239,8 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     saveProgress() {
         if (this.attemptId) {
             this.trackQuestionTime();
-            const formattedAnswers = this.formatAnswers();
             this.http.put(`${this.apiUrl}/attempts/${this.attemptId}/save`, {
-                answers: formattedAnswers,
+                answers: this.formatAnswers(),
                 tabSwitchCount: this.tabSwitchCount
             }).subscribe();
             this.questionStartTime = Date.now();
@@ -211,9 +271,13 @@ export class TestEngineComponent implements OnInit, OnDestroy {
         this.timerSubscription?.unsubscribe();
         this.autoSaveSubscription?.unsubscribe();
 
-        const formattedAnswers = this.formatAnswers();
+        // Exit fullscreen cleanly on submit
+        if (document.fullscreenElement && document.exitFullscreen) {
+            document.exitFullscreen().catch(() => {});
+        }
+
         this.http.post(`${this.apiUrl}/attempts/${this.attemptId}/submit`, {
-            answers: formattedAnswers,
+            answers: this.formatAnswers(),
             tabSwitchCount: this.tabSwitchCount
         }).subscribe({
             next: () => this.router.navigate(['/result', this.attemptId]),
@@ -221,53 +285,25 @@ export class TestEngineComponent implements OnInit, OnDestroy {
         });
     }
 
+    // Limit mode — tab visibility change
     @HostListener('document:visibilitychange')
     onVisibilityChange() {
-        if (!document.hidden) return;  // only act when tab is hidden
-
-        // Off mode — do nothing
+        if (!document.hidden) return;
         if (this.tabSwitchLimit === 0) return;
+        if (this.isBlockMode) return; // block mode handled via fullscreen API
 
-        if (this.isBlockMode) {
-            // Block mode — refocus immediately, show brief overlay, no submit
-            this.isBlocked = true;
-            this.tabWarningMessage = '🚫 Tab switching is not allowed during this test.';
+        // Limit mode
+        this.tabSwitchCount++;
+        const remaining = this.tabSwitchLimit - this.tabSwitchCount;
+
+        if (remaining <= 0) {
+            this.tabWarningMessage = `⚠️ Too many tab switches (${this.tabSwitchCount}/${this.tabSwitchLimit}). Auto-submitting your test now.`;
             this.showTabWarning = true;
-            setTimeout(() => {
-                this.showTabWarning = false;
-                this.isBlocked = false;
-                window.focus();
-            }, 2500);
-            // Force focus back
-            window.focus();
-            return;
-        }
-
-        if (this.isLimitMode) {
-            // Limit mode — count switch, warn, auto-submit if over limit
-            this.tabSwitchCount++;
-            const remaining = this.tabSwitchLimit - this.tabSwitchCount;
-
-            if (remaining <= 0) {
-                this.tabWarningMessage = `⚠️ Too many tab switches (${this.tabSwitchCount}/${this.tabSwitchLimit}). Auto-submitting your test now.`;
-                this.showTabWarning = true;
-                setTimeout(() => this.autoSubmit(), 2000);
-            } else {
-                this.tabWarningMessage = `⚠️ Tab switch detected! (${this.tabSwitchCount}/${this.tabSwitchLimit}) — ${remaining} more will auto-submit your test.`;
-                this.showTabWarning = true;
-                setTimeout(() => this.showTabWarning = false, 4000);
-            }
-        }
-    }
-
-    @HostListener('window:blur')
-    onWindowBlur() {
-        // Also catch window losing focus (e.g. Alt+Tab to another app)
-        if (this.tabSwitchLimit === 0) return;
-
-        if (this.isBlockMode) {
-            // Refocus the window
-            setTimeout(() => window.focus(), 100);
+            setTimeout(() => this.autoSubmit(), 2000);
+        } else {
+            this.tabWarningMessage = `⚠️ Tab switch detected! (${this.tabSwitchCount}/${this.tabSwitchLimit}) — ${remaining} more will auto-submit your test.`;
+            this.showTabWarning = true;
+            setTimeout(() => this.showTabWarning = false, 4000);
         }
     }
 
@@ -279,5 +315,8 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     ngOnDestroy() {
         this.timerSubscription?.unsubscribe();
         this.autoSaveSubscription?.unsubscribe();
+        document.removeEventListener('fullscreenchange', this.onFullscreenChange.bind(this));
+        document.removeEventListener('webkitfullscreenchange', this.onFullscreenChange.bind(this));
+        clearTimeout(this.fullscreenWarningTimeout);
     }
 }
