@@ -73,7 +73,8 @@ const createTest = async (req, res) => {
 
 const getTests = async (req, res) => {
   try {
-    const tests = await Test.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
+    // No createdBy filter — return all tests regardless of who created them
+    const tests = await Test.find().sort({ createdAt: -1 });
 
     const testsWithStats = await Promise.all(tests.map(async (test) => {
       const attempts = await Attempt.find({ test: test._id, completed: true });
@@ -104,7 +105,8 @@ const getTest = async (req, res) => {
 
 const getAllQuestions = async (req, res) => {
   try {
-    const questions = await Question.find({ createdBy: req.user._id }).sort({ createdAt: -1 });
+    // No createdBy filter — return all questions
+    const questions = await Question.find().sort({ createdAt: -1 });
     res.json(questions);
   } catch (error) {
     console.error('Get All Questions Error:', error);
@@ -185,7 +187,7 @@ const deleteQuestion = async (req, res) => {
 
 const deleteAllQuestions = async (req, res) => {
   try {
-    const result = await Question.deleteMany({ createdBy: req.user._id });
+    const result = await Question.deleteMany({});
     res.json({ message: `${result.deletedCount} questions deleted` });
   } catch (error) {
     console.error('Delete All Questions Error:', error);
