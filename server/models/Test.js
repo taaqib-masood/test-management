@@ -51,11 +51,14 @@ const testSchema = new mongoose.Schema({
     unique: true
   },
 
-  // ── NEW: max tab switches allowed before auto-submit (0 = disabled / unlimited)
+  // ── tab switch control:
+  //   -1 = block completely (no submit, just refocus)
+  //    0 = off (no restriction)
+  //    N = auto-submit after N switches
   tabSwitchLimit: {
     type: Number,
     default: 3,
-    min: 0
+    min: -1
   }
 
 }, { timestamps: true });
