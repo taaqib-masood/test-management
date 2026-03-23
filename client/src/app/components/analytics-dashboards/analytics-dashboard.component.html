@@ -4,42 +4,35 @@
 
     <nav class="glass-nav">
         <div class="flex items-center gap-3">
-            <button (click)="goBack()" class="btn btn-ghost btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
-                Back
+            <button (click)="goBack()" class="btn btn-ghost btn-sm">← Back</button>
+            <h1 class="text-xl font-bold gradient-text">Analytics Dashboard</h1>
+        </div>
+        <div class="flex gap-2">
+            <button (click)="selectAll()" class="btn btn-ghost btn-sm">Select All</button>
+            <button (click)="clearSelection()" class="btn btn-ghost btn-sm">Clear</button>
+            <button (click)="loadAnalytics()" [disabled]="selectedTestIds.size === 0 || loading"
+                class="btn btn-primary btn-sm">
+                <span *ngIf="loading" class="spinner spinner-sm"
+                    style="border-color:rgba(255,255,255,0.3);border-top-color:#fff;"></span>
+                {{ loading ? 'Loading...' : 'Generate Report' }}
             </button>
-            <h1 class="text-xl font-bold gradient-text">Compiled Analytics</h1>
         </div>
     </nav>
 
     <div class="container py-8 relative z-10">
 
-        <!-- ── Test Selector ── -->
-        <div class="glass-card p-6 mb-8">
-            <div class="flex-between mb-4 flex-wrap gap-3">
-                <h2 class="text-lg font-bold text-dark">Select Tests to Analyse</h2>
-                <div class="flex gap-2">
-                    <button (click)="selectAll()" class="btn btn-ghost btn-sm">Select All</button>
-                    <button (click)="clearSelection()" class="btn btn-ghost btn-sm" style="color:var(--red);">Clear</button>
-                    <button (click)="loadAnalytics()"
-                        [disabled]="selectedTestIds.size === 0 || loading"
-                        class="btn btn-primary btn-sm">
-                        <span *ngIf="loading" class="spinner spinner-sm"
-                            style="width:14px; height:14px; border-width:2px;
-                                   border-color:rgba(255,255,255,0.3); border-top-color:#fff;"></span>
-                        {{ loading ? 'Loading...' : '📊 Generate Analytics' }}
-                    </button>
-                </div>
-            </div>
+        <!-- Error -->
+        <div *ngIf="error" class="alert alert-error mb-6">{{ error }}</div>
 
-            <div *ngIf="loadingTests" class="flex-center py-6">
+        <!-- Test Selector -->
+        <div class="glass-card p-6 mb-8">
+            <h3 class="font-bold text-dark mb-4">Select Tests to Analyse</h3>
+            <div *ngIf="loadingTests" class="flex-center py-4">
                 <div class="spinner spinner-sm"></div>
                 <span class="text-mid ml-3">Loading tests...</span>
             </div>
-
-            <div *ngIf="!loadingTests" style="display:flex; flex-wrap:wrap; gap:10px;">
+            <div *ngIf="!loadingTests && allTests.length === 0" class="text-mid text-sm">No tests found.</div>
+            <div style="display:flex; flex-wrap:wrap; gap:10px;">
                 <button *ngFor="let test of allTests" type="button"
                     (click)="toggleTest(test._id)"
                     class="btn btn-sm"
@@ -50,356 +43,185 @@
                     <span *ngIf="isTestSelected(test._id)" style="margin-left:4px;">✓</span>
                 </button>
             </div>
-
             <p *ngIf="selectedTestIds.size > 0" class="text-xs text-primary font-semibold mt-3">
                 {{ selectedTestIds.size }} test(s) selected
             </p>
         </div>
 
-        <div *ngIf="error" class="alert alert-error mb-6">{{ error }}</div>
+        <!-- Placeholder -->
+        <div *ngIf="!analytics && !loading" class="glass-card p-12 text-center">
+            <p class="text-mid">Select one or more tests above and click <strong>Generate Report</strong>.</p>
+        </div>
 
-        <!-- ── Analytics Results ── -->
+        <!-- Analytics -->
         <div *ngIf="analytics">
 
             <!-- Summary Cards -->
             <div class="grid grid-4 gap-6 mb-8">
                 <div class="stat-card text-center">
+                    <div class="stat-value indigo">{{ analytics.summary?.totalAttempts || 0 }}</div>
                     <div class="stat-label">Total Attempts</div>
-                    <div class="stat-value indigo">{{ analytics.summary.totalAttempts }}</div>
                 </div>
                 <div class="stat-card text-center">
+                    <div class="stat-value green">{{ analytics.summary?.avgScore || 0 }}%</div>
+                    <div class="stat-label">Avg Score</div>
+                </div>
+                <div class="stat-card text-center">
+                    <div class="stat-value" style="color:var(--primary);">{{ getPassPercent() }}%</div>
+                    <div class="stat-label">Pass Rate</div>
+                </div>
+                <div class="stat-card text-center">
+                    <div class="stat-value" style="color:var(--text-mid);">{{ analytics.summary?.uniqueStudents || 0 }}</div>
                     <div class="stat-label">Unique Students</div>
-                    <div class="stat-value purple">{{ analytics.summary.uniqueStudents }}</div>
-                </div>
-                <div class="stat-card text-center">
-                    <div class="stat-label">Average Score</div>
-                    <div class="stat-value"
-                        [style.color]="analytics.summary.avgScore >= 60 ? 'var(--green)' : 'var(--red)'">
-                        {{ analytics.summary.avgScore }}%
-                    </div>
-                </div>
-                <div class="stat-card text-center">
-                    <div class="stat-label">Avg Time Taken</div>
-                    <div class="stat-value indigo" style="font-size:28px;">
-                        {{ formatTime(analytics.summary.avgTime) }}
-                    </div>
                 </div>
             </div>
 
-            <!-- ── CHART ROW 1: Pass/Fail Pie + Score Distribution ── -->
-            <div class="grid grid-2 gap-6 mb-8">
+            <!-- Pass/Fail + Score Distribution -->
+            <div class="grid grid-2 gap-8 mb-8">
 
-                <!-- Pass / Fail Pie (CSS-based) -->
+                <!-- Pass/Fail Donut -->
                 <div class="glass-card p-6">
                     <h3 class="font-bold text-dark mb-6">Pass / Fail Ratio</h3>
-
-                    <!-- Pie chart using conic-gradient -->
-                    <div style="display:flex; align-items:center; gap:32px;">
-                        <div style="position:relative; flex-shrink:0;">
-                            <div style="width:140px; height:140px; border-radius:50%;
-                                        background: conic-gradient(
-                                            #22c55e 0% {{ getPassPercent() }}%,
-                                            #ef4444 {{ getPassPercent() }}% 100%
-                                        );
-                                        box-shadow: 0 4px 20px rgba(0,0,0,0.1);">
-                            </div>
-                            <!-- Centre hole for donut effect -->
-                            <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-                                        width:80px; height:80px; background:white; border-radius:50%;
-                                        display:flex; flex-direction:column; align-items:center; justify-content:center;">
-                                <span style="font-size:18px; font-weight:800; color:var(--text-dark); line-height:1;">
-                                    {{ getPassPercent() }}%
-                                </span>
-                                <span style="font-size:10px; color:var(--text-light); font-weight:600; text-transform:uppercase;">
-                                    Pass
-                                </span>
+                    <div class="flex-center gap-8">
+                        <div [style.background]="'conic-gradient(var(--green) 0% ' + getPassPercent() + '%, var(--red) ' + getPassPercent() + '% 100%)'"
+                            style="width:120px; height:120px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                            <div style="width:80px; height:80px; border-radius:50%; background:white;
+                                display:flex; align-items:center; justify-content:center;">
+                                <span class="font-bold text-dark">{{ getPassPercent() }}%</span>
                             </div>
                         </div>
-
-                        <div style="display:flex; flex-direction:column; gap:12px; flex:1;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div style="width:14px; height:14px; border-radius:50%; background:#22c55e; flex-shrink:0;"></div>
-                                <div>
-                                    <div class="font-bold text-dark">{{ analytics.summary.passCount }} Passed</div>
-                                    <div class="text-xs text-mid">{{ getPassPercent() }}% of attempts</div>
-                                </div>
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            <div class="flex items-center gap-2">
+                                <span style="width:14px; height:14px; border-radius:50%; background:var(--green); display:inline-block;"></span>
+                                <span class="text-sm text-mid">Pass: <strong class="text-dark">{{ analytics.summary?.passCount || 0 }}</strong></span>
                             </div>
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <div style="width:14px; height:14px; border-radius:50%; background:#ef4444; flex-shrink:0;"></div>
-                                <div>
-                                    <div class="font-bold text-dark">{{ analytics.summary.failCount }} Failed</div>
-                                    <div class="text-xs text-mid">{{ getFailPercent() }}% of attempts</div>
-                                </div>
-                            </div>
-                            <div style="margin-top:8px; padding:10px; background:#f8fafc; border-radius:8px;">
-                                <div class="text-xs text-mid">Pass threshold: <strong>60%</strong></div>
-                                <div class="text-xs text-mid">Total attempts: <strong>{{ analytics.summary.totalAttempts }}</strong></div>
+                            <div class="flex items-center gap-2">
+                                <span style="width:14px; height:14px; border-radius:50%; background:var(--red); display:inline-block;"></span>
+                                <span class="text-sm text-mid">Fail: <strong class="text-dark">{{ analytics.summary?.failCount || 0 }}</strong></span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Score Distribution Bar Chart -->
+                <!-- Score Distribution -->
                 <div class="glass-card p-6">
-                    <h3 class="font-bold text-dark mb-4">Score Distribution</h3>
-                    <div style="display:flex; flex-direction:column; gap:7px;">
+                    <h3 class="font-bold text-dark mb-6">Score Distribution</h3>
+                    <div *ngIf="!analytics.scoreDistribution?.length" class="text-mid text-sm">No data.</div>
+                    <div style="display:flex; align-items:flex-end; gap:8px; height:120px;">
                         <div *ngFor="let bucket of analytics.scoreDistribution"
-                            style="display:flex; align-items:center; gap:10px;">
-                            <span class="text-xs text-mid mono" style="width:56px; flex-shrink:0;">{{ bucket.range }}</span>
-                            <div style="flex:1; height:22px; background:#f1f5f9; border-radius:6px; overflow:hidden; position:relative;">
-                                <div [style.width.%]="getBarWidth(bucket.count)"
-                                    style="height:100%; background:linear-gradient(90deg,#6366f1,#a855f7);
-                                           border-radius:6px; transition:width 0.6s ease; display:flex;
-                                           align-items:center; justify-content:flex-end; padding-right:6px;">
-                                    <span *ngIf="getBarWidth(bucket.count) > 20"
-                                        style="font-size:11px; font-weight:700; color:#fff;">{{ bucket.count }}</span>
-                                </div>
+                            style="display:flex; flex-direction:column; align-items:center; flex:1;">
+                            <span class="text-xs text-mid" style="margin-bottom:4px;">{{ bucket.count }}</span>
+                            <div [style.height]="getBarWidth(bucket.count) + '%'"
+                                [style.background]="(bucket.range === '60-79' || bucket.range === '80-100') ? 'var(--green)' : 'var(--red)'"
+                                style="width:100%; border-radius:4px 4px 0 0; min-height:4px; transition:height 0.3s;">
                             </div>
-                            <span class="text-xs font-bold text-dark" style="width:20px; text-align:right;">
-                                {{ getBarWidth(bucket.count) <= 20 ? bucket.count : '' }}
-                            </span>
+                            <span class="text-xs text-light" style="margin-top:4px;">{{ bucket.range }}%</span>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- ── CHART ROW 2: Student Performance Over Time ── -->
-            <div class="glass-card p-6 mb-8" *ngIf="analytics.performanceOverTime?.length > 0">
-                <h3 class="font-bold text-dark mb-2">Student Performance Over Time</h3>
-                <p class="text-xs text-mid mb-6">Daily average score and number of attempts across selected tests</p>
+            <!-- Performance Over Time -->
+            <div *ngIf="analytics.performanceOverTime?.length" class="glass-card p-6 mb-8">
+                <h3 class="font-bold text-dark mb-6">Performance Over Time (Daily Avg Score)</h3>
+                <div style="display:flex; align-items:flex-end; gap:6px; height:140px; overflow-x:auto;">
+                    <div *ngFor="let day of analytics.performanceOverTime"
+                        style="display:flex; flex-direction:column; align-items:center; min-width:48px; flex:1;">
+                        <span class="text-xs text-mid" style="margin-bottom:4px;">{{ day.avgScore }}%</span>
+                        <div [style.height]="getTimeBarHeight(day.avgScore) + '%'"
+                            [style.background]="day.avgScore >= 60 ? 'var(--green)' : 'var(--red)'"
+                            style="width:100%; border-radius:4px 4px 0 0; min-height:4px; transition:height 0.3s;">
+                        </div>
+                        <span class="text-xs text-light" style="margin-top:4px; white-space:nowrap;">
+                            {{ formatDate(day.date) }}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                <div style="overflow-x:auto;">
-                    <div style="min-width:600px;">
+            <!-- Per-Test Breakdown -->
+            <div *ngIf="analytics.perTest?.length" class="glass-card overflow-hidden mb-8">
+                <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9; background:rgba(248,250,252,0.5);">
+                    <h3 class="font-bold text-dark">Per-Test Breakdown</h3>
+                </div>
+                <div>
+                    <div *ngFor="let t of analytics.perTest">
 
-                        <!-- Bar chart area -->
-                        <div style="display:flex; align-items:flex-end; gap:6px; height:160px; padding-bottom:0;">
-                            <div *ngFor="let d of analytics.performanceOverTime"
-                                style="flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; min-width:40px;">
+                        <!-- Test row header -->
+                        <div (click)="toggleExpandedTest(t.testId)"
+                            style="padding:16px 24px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:center; justify-content:space-between;"
+                            [style.background]="expandedTest === t.testId ? 'rgba(238,242,255,0.3)' : 'transparent'">
+                            <div>
+                                <div class="font-bold text-dark">{{ t.testTitle }}</div>
+                                <div class="text-xs text-mid mt-1">
+                                    {{ t.totalAttempts }} attempts ·
+                                    Avg {{ t.avgScore }}% ·
+                                    Pass {{ t.totalAttempts > 0 ? (t.passCount / t.totalAttempts * 100 | number:'1.0-0') : 0 }}%
+                                </div>
+                            </div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                                viewBox="0 0 24 24" stroke="currentColor"
+                                [style.transform]="expandedTest === t.testId ? 'rotate(180deg)' : 'rotate(0)'"
+                                style="transition:transform 0.2s; color:var(--text-light);">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                            </svg>
+                        </div>
 
-                                <!-- Attempt count badge -->
-                                <span class="text-xs text-light" style="white-space:nowrap;">×{{ d.attempts }}</span>
+                        <!-- Expanded detail -->
+                        <div *ngIf="expandedTest === t.testId"
+                            style="padding:24px; background:rgba(248,250,252,0.5); border-bottom:1px solid #f1f5f9;">
 
-                                <!-- Score bar -->
-                                <div style="width:100%; position:relative; display:flex; flex-direction:column; justify-content:flex-end;"
-                                    [style.height.px]="130">
-                                    <div [style.height.%]="getTimeBarHeight(d.avgScore)"
-                                        [style.background]="d.avgScore >= 60
-                                            ? 'linear-gradient(180deg,#22c55e,#16a34a)'
-                                            : 'linear-gradient(180deg,#f87171,#ef4444)'"
-                                        style="width:100%; border-radius:6px 6px 0 0; transition:height 0.5s ease;
-                                               display:flex; align-items:flex-start; justify-content:center;
-                                               padding-top:4px; min-height:4px;">
-                                        <span *ngIf="d.avgScore >= 20"
-                                            style="font-size:10px; font-weight:700; color:#fff;">
-                                            {{ d.avgScore }}%
-                                        </span>
+                            <!-- Difficulty Heatmap -->
+                            <h4 class="text-sm font-bold text-dark mb-3">Difficulty Heatmap</h4>
+                            <div *ngIf="t.heatmapGrid?.length" style="margin-bottom:24px;">
+                                <div *ngFor="let row of t.heatmapGrid"
+                                    style="display:flex; gap:6px; margin-bottom:6px; align-items:center;">
+                                    <span class="text-xs font-semibold"
+                                        [style.color]="getDifficultyColor(row.difficulty)"
+                                        style="width:52px; flex-shrink:0;">{{ row.difficulty }}</span>
+                                    <div *ngFor="let bucket of row.buckets; let bi = index"
+                                        [style.background]="getHeatColor(bucket, getHeatmapMax(t.heatmapGrid))"
+                                        [style.color]="getHeatTextColor(bucket, getHeatmapMax(t.heatmapGrid))"
+                                        style="flex:1; padding:8px 4px; border-radius:6px; text-align:center; font-size:12px; font-weight:600;">
+                                        {{ bucket > 0 ? bucket : '—' }}
+                                    </div>
+                                </div>
+                                <div style="display:flex; gap:6px; margin-top:4px; padding-left:58px;">
+                                    <span *ngFor="let label of ['0-20%','20-40%','40-60%','60-80%','80-100%']"
+                                        class="text-xs text-light" style="flex:1; text-align:center;">{{ label }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Per-question accuracy -->
+                            <h4 class="text-sm font-bold text-dark mb-3">Per-Question Accuracy</h4>
+                            <div *ngFor="let q of t.questions; let i = index" style="margin-bottom:12px;">
+                                <div class="flex-between mb-1">
+                                    <span class="text-xs text-mid"
+                                        style="max-width:70%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                        Q{{ i + 1 }}. {{ q.text }}
+                                    </span>
+                                    <span class="text-xs font-bold"
+                                        [style.color]="q.correctPercent >= 60 ? 'var(--green)' : 'var(--red)'">
+                                        {{ q.correctPercent }}%
+                                    </span>
+                                </div>
+                                <div style="height:8px; background:#f1f5f9; border-radius:4px; overflow:hidden;">
+                                    <div [style.width.%]="q.correctPercent"
+                                        [style.background]="q.correctPercent >= 60 ? 'var(--green)' : 'var(--red)'"
+                                        style="height:100%; border-radius:4px; transition:width 0.3s;">
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Baseline -->
-                        <div style="height:1px; background:#e2e8f0; margin-bottom:6px;"></div>
-
-                        <!-- Date labels -->
-                        <div style="display:flex; gap:6px;">
-                            <div *ngFor="let d of analytics.performanceOverTime"
-                                style="flex:1; text-align:center; min-width:40px;">
-                                <span class="text-xs text-light mono">{{ formatDate(d.date) }}</span>
-                            </div>
-                        </div>
-
-                        <!-- Legend -->
-                        <div class="flex gap-4 mt-4">
-                            <div class="flex items-center gap-2">
-                                <div style="width:12px; height:12px; border-radius:3px; background:#22c55e;"></div>
-                                <span class="text-xs text-mid">≥ 60% avg (pass zone)</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <div style="width:12px; height:12px; border-radius:3px; background:#ef4444;"></div>
-                                <span class="text-xs text-mid">< 60% avg (fail zone)</span>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-mid">×N = number of attempts that day</span>
-                            </div>
-                        </div>
                     </div>
                 </div>
-
-                <p *ngIf="analytics.performanceOverTime?.length === 0" class="text-center text-mid text-sm py-4">
-                    No time data available yet.
-                </p>
             </div>
 
-            <!-- ── Per-Test Breakdown Table ── -->
-            <div class="glass-card overflow-hidden mb-8">
-                <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9; background:rgba(248,250,252,0.5);">
-                    <h3 class="font-bold text-dark">Per-Test Breakdown</h3>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Test Title</th>
-                                <th>Attempts</th>
-                                <th>Pass</th>
-                                <th>Fail</th>
-                                <th>Avg Score</th>
-                                <th>Detail</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <ng-container *ngFor="let t of analytics.perTest">
-                                <tr>
-                                    <td class="font-bold text-dark">{{ t.title }}</td>
-                                    <td><span class="badge badge-primary">{{ t.totalAttempts }}</span></td>
-                                    <td class="font-bold" style="color:var(--green);">{{ t.passCount }}</td>
-                                    <td class="font-bold" style="color:var(--red);">{{ t.failCount }}</td>
-                                    <td>
-                                        <span class="font-semibold"
-                                            [style.color]="t.avgScore >= 60 ? 'var(--green)' : 'var(--red)'">
-                                            {{ t.avgScore }}%
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <button (click)="toggleExpandedTest(t.testId)"
-                                            class="btn btn-ghost btn-sm text-xs">
-                                            {{ expandedTest === t.testId ? '▲ Hide' : '▼ Show' }} Charts
-                                        </button>
-                                    </td>
-                                </tr>
-
-                                <!-- Expandable section: heatmap + per-question bars -->
-                                <tr *ngIf="expandedTest === t.testId">
-                                    <td colspan="6" style="padding:0; background:rgba(248,250,252,0.5);">
-                                        <div class="p-6" style="display:flex; flex-direction:column; gap:28px;">
-
-                                            <!-- ── CHART: Difficulty Heatmap ── -->
-                                            <div>
-                                                <h4 class="font-bold text-dark mb-2">
-                                                    🌡️ Question Difficulty Heatmap
-                                                </h4>
-                                                <p class="text-xs text-mid mb-4">
-                                                    Each cell shows how many questions of that difficulty fall in each correct-answer rate range.
-                                                    Darker = more questions in that band.
-                                                </p>
-
-                                                <div style="overflow-x:auto;">
-                                                    <table style="border-collapse:separate; border-spacing:4px; min-width:400px;">
-                                                        <thead>
-                                                            <tr>
-                                                                <th style="padding:6px 12px; text-align:left; font-size:11px; color:var(--text-light); font-weight:700; text-transform:uppercase; width:80px;">
-                                                                    Difficulty
-                                                                </th>
-                                                                <th *ngFor="let label of t.heatmapBucketLabels"
-                                                                    style="padding:6px 8px; text-align:center; font-size:11px; color:var(--text-light); font-weight:700; min-width:72px;">
-                                                                    {{ label }}
-                                                                </th>
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody>
-                                                            <tr *ngFor="let row of t.heatmapGrid">
-                                                                <td style="padding:6px 12px; font-size:13px; font-weight:700; text-transform:capitalize;"
-                                                                    [style.color]="getDifficultyColor(row.difficulty)">
-                                                                    {{ row.difficulty }}
-                                                                </td>
-                                                                <td *ngFor="let count of row.buckets"
-                                                                    [style.background]="getHeatColor(count, getHeatmapMax(t.heatmapGrid))"
-                                                                    [style.color]="getHeatTextColor(count, getHeatmapMax(t.heatmapGrid))"
-                                                                    style="padding:12px 8px; text-align:center; border-radius:8px;
-                                                                           font-size:16px; font-weight:800; min-width:72px;
-                                                                           transition:background 0.3s;">
-                                                                    {{ count || '—' }}
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </div>
-
-                                                <!-- Heatmap legend -->
-                                                <div class="flex gap-3 mt-3 items-center flex-wrap">
-                                                    <span class="text-xs text-mid">Intensity:</span>
-                                                    <div *ngFor="let item of [
-                                                            {color:'#f1f5f9', label:'None'},
-                                                            {color:'#dbeafe', label:'Low'},
-                                                            {color:'#93c5fd', label:'Medium'},
-                                                            {color:'#3b82f6', label:'High'},
-                                                            {color:'#1d4ed8', label:'Very High'}
-                                                        ]"
-                                                        style="display:flex; align-items:center; gap:4px;">
-                                                        <div [style.background]="item.color"
-                                                            style="width:14px; height:14px; border-radius:3px; border:1px solid #e2e8f0;">
-                                                        </div>
-                                                        <span class="text-xs text-mid">{{ item.label }}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <!-- ── Per-Question Accuracy Bars ── -->
-                                            <div>
-                                                <h4 class="font-bold text-dark mb-4">📈 Per-Question Accuracy</h4>
-                                                <div *ngFor="let qa of t.questionStats; let i = index"
-                                                    style="margin-bottom:18px;">
-                                                    <div class="flex-between mb-1">
-                                                        <div style="display:flex; align-items:center; gap:8px; max-width:65%;">
-                                                            <span class="text-xs text-mid font-bold">Q{{ i + 1 }}</span>
-                                                            <span class="text-sm font-medium text-dark"
-                                                                style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                                                {{ qa.text }}
-                                                            </span>
-                                                        </div>
-                                                        <div class="flex items-center gap-3">
-                                                            <span class="text-xs font-bold uppercase"
-                                                                [style.color]="getDifficultyColor(qa.difficulty)">
-                                                                {{ qa.difficulty }}
-                                                            </span>
-                                                            <span class="text-xs text-mid">⏱ {{ qa.avgTime }}s</span>
-                                                        </div>
-                                                    </div>
-                                                    <div style="display:flex; height:22px; border-radius:8px; overflow:hidden; background:#f1f5f9;">
-                                                        <div [style.width.%]="qa.correctPercent"
-                                                            style="background:linear-gradient(90deg,#22c55e,#16a34a);
-                                                                   display:flex; align-items:center; justify-content:center;
-                                                                   color:#fff; font-size:11px; font-weight:700;
-                                                                   min-width:0; transition:width 0.5s ease;">
-                                                            <span *ngIf="qa.correctPercent >= 15">{{ qa.correctPercent }}% ✓</span>
-                                                        </div>
-                                                        <div [style.width.%]="100 - qa.correctPercent"
-                                                            style="background:linear-gradient(90deg,#fca5a5,#ef4444);
-                                                                   display:flex; align-items:center; justify-content:center;
-                                                                   color:#fff; font-size:11px; font-weight:700;
-                                                                   min-width:0; transition:width 0.5s ease;">
-                                                            <span *ngIf="(100 - qa.correctPercent) >= 15">
-                                                                {{ 100 - qa.correctPercent }}% ✗
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                    <div class="flex-between mt-1">
-                                                        <span class="text-xs text-green">{{ qa.correctCount }} correct</span>
-                                                        <span class="text-xs text-red">{{ qa.wrongCount }} wrong</span>
-                                                    </div>
-                                                </div>
-
-                                                <div *ngIf="t.questionStats.length === 0"
-                                                    class="text-center text-mid text-sm py-4">
-                                                    No question data available for this test.
-                                                </div>
-                                            </div>
-
-                                        </div>
-                                    </td>
-                                </tr>
-                            </ng-container>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- ── Top Students ── -->
-            <div *ngIf="analytics.topStudents?.length > 0" class="glass-card overflow-hidden">
+            <!-- Top Students -->
+            <div *ngIf="analytics.topStudents?.length" class="glass-card overflow-hidden">
                 <div class="px-6 py-4"
                     style="border-bottom:1px solid #f1f5f9; background:rgba(250,204,21,0.06);">
-                    <h3 class="font-bold text-dark">🏆 Top Students (across selected tests)</h3>
+                    <h3 class="font-bold text-dark">🏆 Top Students</h3>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="data-table">
@@ -407,13 +229,13 @@
                             <tr>
                                 <th style="width:50px;">Rank</th>
                                 <th>Student</th>
-                                <th>Attempts</th>
                                 <th>Avg Score</th>
+                                <th>Tests Taken</th>
+                                <th>Best Score</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr *ngFor="let s of analytics.topStudents; let i = index"
-                                [style.background]="i === 0 ? 'rgba(250,204,21,0.06)' : i === 1 ? 'rgba(192,192,192,0.06)' : i === 2 ? 'rgba(205,127,50,0.06)' : ''">
+                            <tr *ngFor="let s of analytics.topStudents; let i = index">
                                 <td class="font-bold text-center" style="font-size:18px;">
                                     <span *ngIf="i === 0">🥇</span>
                                     <span *ngIf="i === 1">🥈</span>
@@ -421,31 +243,23 @@
                                     <span *ngIf="i > 2" class="text-mid text-sm">{{ i + 1 }}</span>
                                 </td>
                                 <td>
-                                    <div class="font-bold text-dark">{{ s.name }}</div>
-                                    <div class="text-xs text-light">{{ s.email }}</div>
+                                    <div class="font-bold text-dark">{{ s.studentName }}</div>
+                                    <div class="text-xs text-light">{{ s.studentEmail }}</div>
                                 </td>
-                                <td class="text-mid">{{ s.attempts }}</td>
                                 <td>
                                     <span class="font-bold"
                                         [style.color]="s.avgScore >= 60 ? 'var(--green)' : 'var(--red)'">
                                         {{ s.avgScore }}%
                                     </span>
                                 </td>
+                                <td class="text-mid">{{ s.testsTaken }}</td>
+                                <td><span class="badge badge-green">{{ s.bestScore }}%</span></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
             </div>
-        </div>
 
-        <!-- Empty state -->
-        <div *ngIf="!analytics && !loading && selectedTestIds.size === 0"
-            class="glass-card p-12 text-center">
-            <div style="font-size:48px; margin-bottom:16px;">📊</div>
-            <p class="text-mid text-lg">
-                Select one or more tests above and click <strong>Generate Analytics</strong>
-            </p>
         </div>
-
     </div>
 </div>
