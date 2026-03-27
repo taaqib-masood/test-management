@@ -1,0 +1,80 @@
+<div class="page-wrapper flex-center" style="min-height:100vh; padding:24px;">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="flex-center flex-col z-10">
+        <div class="spinner"></div>
+        <p class="text-mid font-medium mt-4 pulse">Analyzing Results...</p>
+    </div>
+
+    <!-- Thank You (No Results) -->
+    <div *ngIf="!loading && !showResults" class="glass-card container-sm p-12 z-10 relative text-center">
+        <div style="font-size:64px; margin-bottom:16px;">🎉</div>
+        <h2 class="text-3xl font-bold gradient-text mb-4">Thank You!</h2>
+        <p class="text-lg text-mid mb-2">
+            Your assessment for <strong class="text-dark">{{ result?.testTitle || 'the test' }}</strong> has been
+            submitted successfully.
+        </p>
+        <p class="text-mid">Your responses have been recorded. The administrator will review the results.</p>
+        <div class="mt-10">
+            <p class="text-xs text-light">You may now close this window.</p>
+        </div>
+    </div>
+
+    <!-- Results Shown -->
+    <div *ngIf="!loading && showResults" class="container-lg z-10 relative">
+        <div class="glass-card p-12 text-center">
+            <h2 class="text-4xl font-bold gradient-text mb-2">Assessment Complete!</h2>
+            <p class="text-mid text-lg mb-10">
+                Here are your results for <strong class="text-dark">{{ result?.testTitle }}</strong>
+            </p>
+
+            <!-- Score Ring -->
+            <div class="flex-center mb-10">
+                <div class="score-ring" [style.borderColor]="passed ? '#dcfce7' : '#fef2f2'">
+                    <span class="text-5xl font-extrabold" [style.color]="passed ? 'var(--green)' : 'var(--red)'">
+                        {{ percentage }}%
+                    </span>
+                    <span class="text-xs font-semibold text-light uppercase tracking-wider mt-2">Score</span>
+                </div>
+            </div>
+
+            <!-- Result Message -->
+            <div class="mb-10">
+                <h3 class="text-2xl font-bold mb-2" [style.color]="passed ? 'var(--green)' : 'var(--red)'">
+                    {{ passed ? 'Congratulations! You Passed.' : 'Keep Learning. Try Again.' }}
+                </h3>
+                <p class="text-mid" style="max-width:480px; margin:0 auto;">
+                    {{ passed ? 'Great job! You demonstrated a solid understanding of the material.' : 'Review the
+                    material and try again. You\'ve got this!' }}
+                </p>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-3 gap-6 mb-10">
+                <div class="stat-card text-center">
+                    <span class="stat-value indigo">{{ result?.score }}</span>
+                    <span class="stat-label">Correct</span>
+                </div>
+                <div class="stat-card text-center">
+                    <span class="stat-value" style="color:var(--red);">{{ result?.totalQuestions - result?.score
+                        }}</span>
+                    <span class="stat-label">Incorrect</span>
+                </div>
+                <div class="stat-card text-center">
+                    <span class="stat-value" style="color:var(--text-mid);">{{ result?.timeTaken }}s</span>
+                    <span class="stat-label">Time Taken</span>
+                </div>
+            </div>
+
+            <div class="mt-6">
+                <button (click)="printCertificate()" class="btn btn-primary btn-lg" style="gap:10px;">
+                    🖨️ Download Certificate
+                </button>
+            </div>
+
+            <p class="text-xs text-light mt-6">You may now close this window.</p>
+        </div>
+    </div>
+</div>

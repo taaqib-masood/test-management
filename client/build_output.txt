@@ -1,0 +1,13 @@
+﻿[33mΓ¥»[39m Building...
+[32mΓ£ö[39m Building...
+[1mInitial chunk files[22m  [2m | [22m[1mNames[22m        [2m | [22m [1mRaw size[22m[2m | [22m[1mEstimated transfer size[22m
+[32mmain-I56THRUB.js[39m     [2m | [22m[2mmain[22m         [2m | [22m[36m399.17 kB[39m[2m | [22m              [36m101.51 kB[39m
+[32mpolyfills-6ISPNSXF.js[39m[2m | [22m[2mpolyfills[22m    [2m | [22m [36m35.68 kB[39m[2m | [22m               [36m11.57 kB[39m
+[32mstyles-7PTBNDJ7.css[39m  [2m | [22m[2mstyles[22m       [2m | [22m [36m12.64 kB[39m[2m | [22m                [36m3.02 kB[39m
+
+[1m [22m                    [2m | [22m[1mInitial total[22m[2m | [22m[1m447.49 kB[22m[2m | [22m              [1m116.10 kB[22m
+
+Application bundle generation complete. [5.837 seconds] - 2026-02-15T10:15:22.599Z
+
+Output location: C:\Users\Admin\Desktop\LTTS TEST\client\dist\client
+

@@ -1,0 +1,198 @@
+<!-- ═══════════════════════════════════════════════════════════
+     HIDDEN WEBCAM ELEMENTS (required for face-api.js)
+═══════════════════════════════════════════════════════════ -->
+<video #videoElement autoplay muted playsinline
+       style="position:fixed;top:0;right:0;width:160px;height:120px;
+              z-index:9999;border-radius:8px;opacity:0.9;
+              border:2px solid #333;"></video>
+<canvas #canvasElement style="display:none;"></canvas>
+
+<!-- ═══════════════════════════════════════════════════════════
+     VIOLATION WARNING OVERLAY
+═══════════════════════════════════════════════════════════ -->
+<div *ngIf="showTabWarning" class="violation-overlay">
+  <div class="violation-card">
+    <div class="violation-icon">⚠️</div>
+    <h3>Violation Detected</h3>
+    <p>{{ warningMessage }}</p>
+    <div class="suspicion-info">
+      <span>Suspicion Score:</span>
+      <strong [class.score-low]="riskLevel === 'LOW'"
+              [class.score-medium]="riskLevel === 'MEDIUM'"
+              [class.score-high]="riskLevel === 'HIGH'">
+        {{ suspicionScore }}
+      </strong>
+      <span class="risk-badge"
+            [class.risk-low]="riskLevel === 'LOW'"
+            [class.risk-medium]="riskLevel === 'MEDIUM'"
+            [class.risk-high]="riskLevel === 'HIGH'">
+        {{ riskLevel }}
+      </span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     AUTO-SUBMITTING OVERLAY
+═══════════════════════════════════════════════════════════ -->
+<div *ngIf="isSubmitting" class="submitting-overlay">
+  <div class="submitting-card">
+    <div class="spinner"></div>
+    <h3>Submitting your test...</h3>
+    <p>Please do not close this window.</p>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN TEST CONTAINER
+═══════════════════════════════════════════════════════════ -->
+<div class="test-container" *ngIf="questions.length > 0 && !isSubmitting">
+
+  <!-- ── HEADER ─────────────────────────────────────────── -->
+  <div class="test-header">
+    <div class="test-info">
+      <h2>{{ testTitle }}</h2>
+    </div>
+
+    <div class="header-right">
+      <!-- Timer -->
+      <div class="timer" [class.timer-warning]="timeLeft < 300" [class.timer-danger]="timeLeft < 60">
+        <span class="timer-icon">⏱</span>
+        {{ formatTime(timeLeft) }}
+      </div>
+
+      <!-- Suspicion Score -->
+      <div class="suspicion-bar-wrap" *ngIf="antiCheatingEnabled">
+        <span class="suspicion-label">Risk:</span>
+        <div class="suspicion-bar">
+          <div class="suspicion-fill"
+               [style.width.%]="suspicionScore"
+               [class.fill-low]="riskLevel === 'LOW'"
+               [class.fill-medium]="riskLevel === 'MEDIUM'"
+               [class.fill-high]="riskLevel === 'HIGH'">
+          </div>
+        </div>
+        <span class="risk-badge-sm"
+              [class.risk-low]="riskLevel === 'LOW'"
+              [class.risk-medium]="riskLevel === 'MEDIUM'"
+              [class.risk-high]="riskLevel === 'HIGH'">
+          {{ riskLevel }} ({{ suspicionScore }})
+        </span>
+      </div>
+
+      <!-- Nav toggle -->
+      <button class="nav-panel-btn" (click)="showNavPanel = !showNavPanel">
+        ⊞ Overview
+      </button>
+    </div>
+  </div>
+
+  <!-- ── PROGRESS BAR ───────────────────────────────────── -->
+  <div class="progress-section">
+    <div class="progress-meta">
+      <span>Question {{ currentQuestionIndex + 1 }} of {{ questions.length }}</span>
+      <span>{{ answeredCount }} / {{ questions.length }} answered ({{ progressPercent }}%)</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" [style.width.%]="progressPercent"></div>
+    </div>
+  </div>
+
+  <!-- ── QUESTION NAVIGATION PANEL ─────────────────────── -->
+  <div class="nav-panel" *ngIf="showNavPanel">
+    <div class="nav-panel-header">
+      <h3>Question Overview</h3>
+      <button (click)="showNavPanel = false">✕</button>
+    </div>
+    <div class="nav-legend">
+      <span><span class="dot dot-answered"></span> Answered</span>
+      <span><span class="dot dot-flagged"></span> Flagged</span>
+      <span><span class="dot dot-visited"></span> Visited</span>
+      <span><span class="dot dot-unanswered"></span> Not Answered</span>
+    </div>
+    <div class="question-grid">
+      <button *ngFor="let q of questions; let i = index"
+              class="q-btn"
+              [class.q-answered]="getQuestionStatus(q._id) === 'answered'"
+              [class.q-flagged]="getQuestionStatus(q._id) === 'flagged'"
+              [class.q-visited]="getQuestionStatus(q._id) === 'visited'"
+              [class.q-current]="i === currentQuestionIndex"
+              (click)="goToQuestion(i); showNavPanel = false">
+        {{ i + 1 }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── QUESTION CARD ──────────────────────────────────── -->
+  <div class="question-card" *ngIf="currentQuestion">
+
+    <div class="question-card-header">
+      <div class="question-number-badge">
+        Q{{ currentQuestionIndex + 1 }}
+        <span class="flag-tag" *ngIf="isFlagged(currentQuestion._id)">🚩 Flagged</span>
+      </div>
+      <div class="question-actions">
+        <button class="btn-action btn-flag"
+                [class.flagged]="isFlagged(currentQuestion._id)"
+                (click)="flagQuestion()">
+          🚩 {{ isFlagged(currentQuestion._id) ? 'Unflag' : 'Flag' }}
+        </button>
+        <button class="btn-action btn-clear"
+                (click)="clearAnswer()"
+                [disabled]="getSelectedOption() === null">
+          ✕ Clear
+        </button>
+      </div>
+    </div>
+
+    <div class="question-text">
+      {{ currentQuestion.text }}
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="options-list">
+      <div *ngFor="let option of currentQuestion.options; let i = index"
+           class="option-item"
+           [class.option-selected]="getSelectedOption() === i"
+           (click)="selectOption(i)">
+        <span class="option-label">{{ ['A','B','C','D','E'][i] }}</span>
+        <span class="option-text">{{ option }}</span>
+        <span class="option-check" *ngIf="getSelectedOption() === i">✓</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── NAVIGATION CONTROLS ────────────────────────────── -->
+  <div class="controls-bar">
+    <button class="btn btn-secondary"
+            (click)="prevQuestion()"
+            [disabled]="currentQuestionIndex === 0">
+      ← Previous
+    </button>
+
+    <div class="controls-center">
+      <span class="q-counter">{{ currentQuestionIndex + 1 }} / {{ questions.length }}</span>
+    </div>
+
+    <ng-container *ngIf="currentQuestionIndex < questions.length - 1">
+      <button class="btn btn-primary" (click)="nextQuestion()">
+        Next →
+      </button>
+    </ng-container>
+
+    <ng-container *ngIf="currentQuestionIndex === questions.length - 1">
+      <button class="btn btn-success" (click)="submitTest()">
+        ✓ Submit Test
+      </button>
+    </ng-container>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     LOADING STATE
+═══════════════════════════════════════════════════════════ -->
+<div *ngIf="questions.length === 0 && !isSubmitting" class="loading-screen">
+  <div class="spinner"></div>
+  <p>Loading test...</p>
+</div>

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>Client</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <div id="global-error" style="color: red; font-weight: bold; padding: 20px; display: none;"></div>
+  <script>
+    window.onerror = function (message, source, lineno, colno, error) {
+      var div = document.getElementById('global-error');
+      div.style.display = 'block';
+      div.innerHTML += 'Global Error: ' + message + ' at ' + source + ':' + lineno + '<br>';
+    };
+  </script>
+  <app-root></app-root>
+</body>
+
+</html>

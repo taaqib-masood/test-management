@@ -1,0 +1,388 @@
+<div class="page-wrapper" style="min-height:100vh;">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Nav -->
+    <nav class="glass-nav">
+        <div class="flex items-center gap-3">
+            <button (click)="goBack()" class="btn btn-ghost btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+            </button>
+            <h1 class="text-2xl font-bold gradient-text">Analytics Dashboard</h1>
+        </div>
+        <div *ngIf="selectedTestIds.length > 0" class="flex gap-2">
+            <button (click)="loadAnalytics()" class="btn btn-primary btn-sm" [disabled]="loading">
+                {{ loading ? 'Loading...' : '📊 Run Analytics' }}
+            </button>
+            <button (click)="clearSelection()" class="btn btn-ghost btn-sm">Clear</button>
+        </div>
+    </nav>
+
+    <div class="container py-8 relative z-10">
+
+        <!-- Error -->
+        <div *ngIf="error" class="alert alert-error mb-6">{{ error }}</div>
+
+        <!-- ── Test Selector + Cut-off on same row ── -->
+        <div class="glass-card p-6 mb-8">
+            <div class="flex-between flex-wrap gap-4 mb-4">
+                <h2 class="font-bold text-dark">Select Tests to Analyse</h2>
+
+                <!-- Pass/Fail Cut-off editor -->
+                <div style="display:flex; align-items:center; gap:10px; background:rgba(248,250,252,0.8); border:1.5px solid #e2e8f0; border-radius:12px; padding:8px 14px;">
+                    <span class="text-sm font-semibold text-mid">Pass cut-off:</span>
+
+                    <!-- View mode -->
+                    <div *ngIf="!editingCutoff" style="display:flex; align-items:center; gap:8px;">
+                        <span class="text-lg font-extrabold" [style.color]="'var(--primary)'">{{ cutoff }}%</span>
+                        <button (click)="startEditCutoff()"
+                            title="Edit cut-off"
+                            style="background:none; border:none; padding:3px; cursor:pointer; display:flex; align-items:center; border-radius:4px; color:var(--text-light);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                        </button>
+                    </div>
+
+                    <!-- Edit mode -->
+                    <div *ngIf="editingCutoff" style="display:flex; align-items:center; gap:6px;">
+                        <input
+                            [(ngModel)]="cutoffDraft"
+                            type="number"
+                            min="1"
+                            max="100"
+                            (keydown.enter)="saveCutoff()"
+                            (keydown.escape)="cancelCutoff()"
+                            style="width:64px; padding:4px 8px; border:1.5px solid var(--primary); border-radius:8px;
+                                   font-size:14px; font-weight:700; text-align:center; outline:none;
+                                   background:white; color:var(--primary);"
+                            autofocus />
+                        <span class="text-sm font-bold text-mid">%</span>
+                        <!-- Save -->
+                        <button (click)="saveCutoff()"
+                            style="background:var(--green); border:none; border-radius:6px; padding:5px 7px; cursor:pointer; display:flex; align-items:center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="white">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                            </svg>
+                        </button>
+                        <!-- Cancel -->
+                        <button (click)="cancelCutoff()"
+                            style="background:#e2e8f0; border:none; border-radius:6px; padding:5px 7px; cursor:pointer; display:flex; align-items:center;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="#64748b">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test pills -->
+            <div *ngIf="loadingTests" class="flex-center py-6">
+                <div class="spinner spinner-sm"></div>
+                <span class="text-mid ml-3">Loading tests...</span>
+            </div>
+
+            <div *ngIf="!loadingTests && allTests.length === 0" class="text-center text-mid py-6">
+                No tests found. Create some tests first.
+            </div>
+
+            <div *ngIf="!loadingTests && allTests.length > 0" style="display:flex; flex-wrap:wrap; gap:10px;">
+                <button *ngFor="let test of allTests" (click)="toggleTest(test._id)"
+                    class="btn btn-sm"
+                    [class.btn-primary]="isTestSelected(test._id)"
+                    [class.btn-ghost]="!isTestSelected(test._id)">
+                    {{ test.title }}
+                </button>
+            </div>
+
+            <div class="flex-between mt-3 flex-wrap gap-2">
+                <p *ngIf="selectedTestIds.length > 0" class="text-xs text-mid">
+                    {{ selectedTestIds.length }} test(s) selected
+                </p>
+                <button *ngIf="!loadingTests && allTests.length > 0" (click)="selectAll()" class="btn btn-ghost btn-sm text-primary" style="font-size:12px;">
+                    Select All & Run
+                </button>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div *ngIf="loading" class="flex-center flex-col py-16">
+            <div class="spinner"></div>
+            <p class="text-mid mt-4 font-medium">Crunching numbers...</p>
+        </div>
+
+        <!-- Analytics Content -->
+        <div *ngIf="!loading && analytics">
+
+            <!-- Cut-off reminder banner -->
+            <div style="background:rgba(99,102,241,0.08); border:1.5px solid rgba(99,102,241,0.2); border-radius:12px; padding:10px 18px; margin-bottom:24px; display:flex; align-items:center; gap:10px;">
+                <span style="font-size:18px;">🎯</span>
+                <span class="text-sm text-dark">Pass threshold set to <strong>{{ cutoff }}%</strong>. Students scoring at or above this are marked as passed.</span>
+                <button (click)="startEditCutoff()" class="btn btn-ghost btn-sm" style="margin-left:auto; font-size:12px;">Edit</button>
+            </div>
+
+            <!-- ── Summary Cards ── -->
+            <div class="grid grid-4 gap-6 mb-8">
+                <div class="stat-card text-center">
+                    <div class="stat-label">Total Attempts</div>
+                    <div class="stat-value indigo">{{ analytics.summary.totalAttempts }}</div>
+                </div>
+                <div class="stat-card text-center">
+                    <div class="stat-label">Unique Students</div>
+                    <div class="stat-value purple">{{ analytics.summary.uniqueStudents }}</div>
+                </div>
+                <div class="stat-card text-center">
+                    <div class="stat-label">Avg Score</div>
+                    <div class="stat-value" [style.color]="analytics.summary.avgScore >= cutoff ? 'var(--green)' : 'var(--red)'">
+                        {{ analytics.summary.avgScore }}%
+                    </div>
+                </div>
+                <div class="stat-card text-center">
+                    <div class="stat-label">Avg Time</div>
+                    <div class="stat-value" style="color:var(--text-mid);">{{ formatTime(analytics.summary.avgTime) }}</div>
+                </div>
+            </div>
+
+            <!-- ── Row 1: Pass/Fail Donut + Score Distribution ── -->
+            <div class="grid grid-2 gap-8 mb-8">
+
+                <!-- Pass/Fail Donut -->
+                <div class="glass-card p-8">
+                    <div class="flex-between mb-6">
+                        <h3 class="font-bold text-dark">Pass / Fail Ratio</h3>
+                        <span class="badge badge-primary" style="font-size:11px;">Cut-off: {{ cutoff }}%</span>
+                    </div>
+                    <div class="flex-center gap-8 flex-wrap">
+                        <div style="position:relative; width:160px; height:160px; flex-shrink:0;">
+                            <div [style.background]="'conic-gradient(#22c55e 0deg ' + getPassDeg() + 'deg, #ef4444 ' + getPassDeg() + 'deg 360deg)'"
+                                style="width:160px; height:160px; border-radius:50%;"></div>
+                            <div style="position:absolute; inset:24px; background:white; border-radius:50%; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+                                <span class="text-2xl font-extrabold" [style.color]="getPassPercent() >= 50 ? 'var(--green)' : 'var(--red)'">
+                                    {{ getPassPercent() }}%
+                                </span>
+                                <span class="text-xs text-light uppercase tracking-wider">Pass</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:12px;">
+                            <div class="flex items-center gap-3">
+                                <span style="width:14px; height:14px; border-radius:50%; background:#22c55e; flex-shrink:0;"></span>
+                                <div>
+                                    <div class="font-bold text-dark">{{ analytics.summary.passCount }} Passed</div>
+                                    <div class="text-xs text-mid">Score ≥ {{ cutoff }}%</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span style="width:14px; height:14px; border-radius:50%; background:#ef4444; flex-shrink:0;"></span>
+                                <div>
+                                    <div class="font-bold text-dark">{{ analytics.summary.failCount }} Failed</div>
+                                    <div class="text-xs text-mid">Score &lt; {{ cutoff }}%</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span style="width:14px; height:14px; border-radius:50%; background:#6366f1; flex-shrink:0;"></span>
+                                <div>
+                                    <div class="font-bold text-dark">{{ analytics.summary.totalAttempts }} Total</div>
+                                    <div class="text-xs text-mid">All attempts</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Score Distribution Bar Chart -->
+                <div class="glass-card p-8">
+                    <h3 class="font-bold text-dark mb-6">Score Distribution</h3>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <div *ngFor="let bucket of analytics.scoreDistribution"
+                            style="display:flex; align-items:center; gap:10px;">
+                            <span class="text-xs mono text-mid" style="width:56px; flex-shrink:0;">{{ bucket.range }}%</span>
+                            <div style="flex:1; background:#f1f5f9; border-radius:6px; overflow:hidden; height:22px;">
+                                <div [style.width.%]="getBarWidth(bucket.count)"
+                                    style="height:100%; background:linear-gradient(90deg,#6366f1,#a855f7); border-radius:6px; transition:width 0.5s ease; display:flex; align-items:center; justify-content:flex-end; padding-right:6px;">
+                                    <span *ngIf="bucket.count > 0" class="text-xs font-bold text-white">{{ bucket.count }}</span>
+                                </div>
+                            </div>
+                            <span class="text-xs text-mid" style="width:24px; text-align:right;">{{ bucket.count }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Performance Over Time ── -->
+            <div *ngIf="analytics.performanceOverTime?.length > 0" class="glass-card p-8 mb-8">
+                <h3 class="font-bold text-dark mb-2">Student Performance Over Time</h3>
+                <p class="text-xs text-mid mb-6">Daily average score — green = at or above cut-off ({{ cutoff }}%), red = below</p>
+                <div style="display:flex; align-items:flex-end; gap:6px; height:160px; overflow-x:auto; padding-bottom:4px;">
+                    <div *ngFor="let day of analytics.performanceOverTime"
+                        style="display:flex; flex-direction:column; align-items:center; gap:4px; min-width:44px; flex:1;">
+                        <div style="width:100%; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:120px;">
+                            <span class="text-xs font-bold" [style.color]="day.avgScore >= cutoff ? 'var(--green)' : 'var(--red)'">
+                                {{ day.avgScore }}%
+                            </span>
+                            <div [style.height.%]="getTimeBarHeight(day.avgScore)"
+                                [style.background]="day.avgScore >= cutoff ? 'linear-gradient(180deg,#22c55e,#16a34a)' : 'linear-gradient(180deg,#ef4444,#dc2626)'"
+                                style="width:100%; border-radius:6px 6px 0 0; max-height:90px; min-height:4px; transition:height 0.5s ease;">
+                            </div>
+                        </div>
+                        <span class="text-xs text-mid" style="white-space:nowrap;">{{ formatDate(day.date) }}</span>
+                        <span class="text-xs text-light">{{ day.attempts }} att.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Per-Test Expandable Breakdown ── -->
+            <div class="glass-card overflow-hidden mb-8">
+                <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9; background:rgba(248,250,252,0.5);">
+                    <h3 class="font-bold text-dark">Per-Test Breakdown</h3>
+                    <p class="text-xs text-mid mt-1">Click a row to see per-question accuracy and difficulty heatmap</p>
+                </div>
+
+                <div *ngFor="let test of analytics.perTest">
+                    <div (click)="toggleExpandedTest(test.testId)"
+                        style="padding:16px 24px; border-bottom:1px solid #f1f5f9; cursor:pointer; display:flex; align-items:center; gap:16px; flex-wrap:wrap;"
+                        [style.background]="expandedTestId === test.testId ? 'rgba(238,242,255,0.4)' : 'transparent'">
+                        <span class="font-bold text-dark" style="flex:1; min-width:200px;">{{ test.testTitle }}</span>
+                        <span class="badge badge-primary">{{ test.totalAttempts }} attempts</span>
+                        <span class="badge" [class.badge-green]="test.avgScore >= cutoff" [class.badge-red]="test.avgScore < cutoff">
+                            Avg {{ test.avgScore }}%
+                        </span>
+                        <span class="text-xs" style="color:var(--green);">✓ {{ test.passCount }} passed</span>
+                        <span class="text-xs" style="color:var(--red);">✗ {{ test.failCount }} failed</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                            [style.transform]="expandedTestId === test.testId ? 'rotate(180deg)' : 'none'"
+                            style="transition:transform 0.2s; color:var(--text-light); flex-shrink:0;">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </div>
+
+                    <div *ngIf="expandedTestId === test.testId"
+                        style="background:rgba(248,250,252,0.5); padding:24px; border-bottom:1px solid #f1f5f9;">
+                        <div class="grid grid-2 gap-8">
+
+                            <!-- Difficulty Heatmap -->
+                            <div>
+                                <h4 class="font-bold text-dark mb-4 text-sm uppercase tracking-wider">Difficulty Heatmap</h4>
+                                <p class="text-xs text-mid mb-4">Rows = difficulty · Columns = % of students who answered correctly</p>
+                                <div style="display:grid; grid-template-columns:60px repeat(5,1fr); gap:4px; margin-bottom:4px;">
+                                    <div></div>
+                                    <div *ngFor="let lbl of ['0–20%','21–40%','41–60%','61–80%','81–100%']"
+                                        class="text-xs text-mid text-center" style="font-size:10px;">{{ lbl }}</div>
+                                </div>
+                                <div *ngFor="let row of test.heatmapGrid"
+                                    style="display:grid; grid-template-columns:60px repeat(5,1fr); gap:4px; margin-bottom:4px; align-items:center;">
+                                    <span class="text-xs font-semibold uppercase" [style.color]="getDifficultyColor(row.difficulty)">
+                                        {{ row.difficulty }}
+                                    </span>
+                                    <div *ngFor="let cell of row.buckets"
+                                        [style.background]="getHeatColor(cell, getHeatmapMax(test.heatmapGrid))"
+                                        [style.color]="getHeatTextColor(cell, getHeatmapMax(test.heatmapGrid))"
+                                        style="height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:700;">
+                                        {{ cell || '' }}
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 mt-4">
+                                    <span class="text-xs text-mid">Less</span>
+                                    <div style="width:12px; height:12px; border-radius:3px; background:#f1f5f9;"></div>
+                                    <div style="width:12px; height:12px; border-radius:3px; background:#dbeafe;"></div>
+                                    <div style="width:12px; height:12px; border-radius:3px; background:#93c5fd;"></div>
+                                    <div style="width:12px; height:12px; border-radius:3px; background:#3b82f6;"></div>
+                                    <div style="width:12px; height:12px; border-radius:3px; background:#1d4ed8;"></div>
+                                    <span class="text-xs text-mid">More</span>
+                                </div>
+                            </div>
+
+                            <!-- Per-Question Accuracy -->
+                            <div>
+                                <h4 class="font-bold text-dark mb-4 text-sm uppercase tracking-wider">Per-Question Accuracy</h4>
+                                <div *ngIf="!test.questions?.length" class="text-mid text-sm">No question data.</div>
+                                <div style="display:flex; flex-direction:column; gap:10px; max-height:320px; overflow-y:auto;">
+                                    <div *ngFor="let q of test.questions; let i = index">
+                                        <div class="flex-between mb-1">
+                                            <span class="text-xs font-medium text-dark"
+                                                style="max-width:75%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                                Q{{ i + 1 }}. {{ q.text }}
+                                            </span>
+                                            <span class="text-xs font-bold"
+                                                [style.color]="q.correctPercent >= cutoff ? 'var(--green)' : 'var(--red)'">
+                                                {{ q.correctPercent }}%
+                                            </span>
+                                        </div>
+                                        <div style="height:10px; background:#f1f5f9; border-radius:99px; overflow:hidden;">
+                                            <div [style.width.%]="q.correctPercent"
+                                                [style.background]="q.correctPercent >= cutoff ? '#22c55e' : '#ef4444'"
+                                                style="height:100%; border-radius:99px; transition:width 0.5s ease;">
+                                            </div>
+                                        </div>
+                                        <div class="flex gap-3 mt-1">
+                                            <span class="text-xs" [style.color]="getDifficultyColor(q.difficulty)">{{ q.difficulty }}</span>
+                                            <span class="text-xs text-light">{{ q.totalAttempts }} responses · avg {{ formatTime(q.avgTime) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Top Students Leaderboard ── -->
+            <div *ngIf="analytics.topStudents?.length > 0" class="glass-card overflow-hidden">
+                <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg, rgba(250,204,21,0.08), rgba(245,158,11,0.08));">
+                    <h3 class="font-bold text-dark">🏆 Top Performers</h3>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th style="width:50px;">Rank</th>
+                                <th>Student</th>
+                                <th>Avg Score</th>
+                                <th>Tests Taken</th>
+                                <th>Best Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr *ngFor="let s of analytics.topStudents; let i = index"
+                                [style.background]="i === 0 ? 'rgba(250,204,21,0.06)' : i === 1 ? 'rgba(192,192,192,0.06)' : i === 2 ? 'rgba(205,127,50,0.06)' : ''">
+                                <td class="font-bold text-center" style="font-size:18px;">
+                                    <span *ngIf="i === 0">🥇</span>
+                                    <span *ngIf="i === 1">🥈</span>
+                                    <span *ngIf="i === 2">🥉</span>
+                                    <span *ngIf="i > 2" class="text-mid text-sm">{{ i + 1 }}</span>
+                                </td>
+                                <td>
+                                    <div class="font-bold text-dark">{{ s.studentName }}</div>
+                                    <div class="text-xs text-light">{{ s.studentEmail }}</div>
+                                </td>
+                                <td>
+                                    <span class="font-bold" [style.color]="s.avgScore >= cutoff ? 'var(--green)' : 'var(--red)'">
+                                        {{ s.avgScore }}%
+                                    </span>
+                                </td>
+                                <td class="text-mid">{{ s.testsTaken }}</td>
+                                <td>
+                                    <span class="badge" [class.badge-green]="s.bestScore >= cutoff" [class.badge-red]="s.bestScore < cutoff">
+                                        {{ s.bestScore }}%
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div><!-- end analytics -->
+
+        <!-- Empty state -->
+        <div *ngIf="!loading && !analytics && selectedTestIds.length === 0" class="glass-card p-12 text-center">
+            <div style="font-size:48px; margin-bottom:16px;">📊</div>
+            <h3 class="text-xl font-bold text-dark mb-2">Select tests above to get started</h3>
+            <p class="text-mid">Choose one or more tests, then click "Run Analytics" to generate charts.</p>
+        </div>
+
+    </div>
+</div>

@@ -1,0 +1,265 @@
+<div class="page-wrapper" style="min-height:100vh;">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <nav class="glass-nav">
+        <div class="flex items-center gap-3">
+            <button (click)="goBack()" class="btn btn-ghost btn-sm">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back
+            </button>
+            <h1 class="text-xl font-bold gradient-text">Test Results</h1>
+        </div>
+        <div class="flex gap-2">
+            <button *ngIf="test && attempts.length > 0" (click)="exportToExcel()" class="btn btn-success btn-sm"
+                [disabled]="exporting">
+                {{ exporting ? '⏳ Exporting...' : '📊 Export to Excel' }}
+            </button>
+            <button *ngIf="test" (click)="copyLink()" class="btn btn-ghost btn-sm text-primary">
+                Copy Test Link
+            </button>
+        </div>
+    </nav>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="flex-center flex-col" style="padding:80px 0;">
+        <div class="spinner"></div>
+        <p class="text-mid font-medium mt-4">Loading results...</p>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="error" class="container text-center py-12">
+        <div class="alert alert-error" style="display:inline-flex;">{{ error }}</div>
+    </div>
+
+    <!-- Results -->
+    <div *ngIf="!loading && test" class="container py-8 relative z-10">
+        <!-- Test Info Header -->
+        <div class="glass-card p-6 mb-8">
+            <h2 class="text-2xl font-bold text-dark mb-2">{{ test.title }}</h2>
+            <div class="flex gap-4 flex-wrap text-sm text-mid">
+                <span>⏱ {{ test.duration }} min</span>
+                <span>📝 {{ test.totalQuestions }} questions</span>
+                <span>👥 {{ attempts.length }} attempt{{ attempts.length !== 1 ? 's' : '' }}</span>
+                <span class="badge" [class.badge-green]="test.showResults" [class.badge-red]="!test.showResults">
+                    Results {{ test.showResults ? 'Visible' : 'Hidden' }} to students
+                </span>
+            </div>
+        </div>
+
+        <!-- 🏆 Admin-Only Leaderboard -->
+        <div *ngIf="attempts.length > 0" class="glass-card overflow-hidden mb-8">
+            <div class="px-6 py-4"
+                style="border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg, rgba(250,204,21,0.08), rgba(245,158,11,0.08));">
+                <div class="flex-between">
+                    <h3 class="font-bold text-dark">🏆 Leaderboard <span class="text-xs font-medium text-mid">(Admin
+                            Only)</span></h3>
+                    <span class="text-xs text-mid">Ranked by score, then time</span>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th style="width:50px;">Rank</th>
+                            <th>Student</th>
+                            <th>Score</th>
+                            <th>Percentage</th>
+                            <th>Time Taken</th>
+                            <th>Tab Switches</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr *ngFor="let attempt of attempts; let i = index"
+                            [style.background]="i === 0 ? 'rgba(250,204,21,0.06)' : i === 1 ? 'rgba(192,192,192,0.06)' : i === 2 ? 'rgba(205,127,50,0.06)' : ''">
+                            <td class="font-bold text-center" style="font-size:18px;">
+                                <span *ngIf="i === 0">🥇</span>
+                                <span *ngIf="i === 1">🥈</span>
+                                <span *ngIf="i === 2">🥉</span>
+                                <span *ngIf="i > 2" class="text-mid text-sm">{{ i + 1 }}</span>
+                            </td>
+                            <td>
+                                <div class="font-bold text-dark">{{ attempt.studentName }}</div>
+                                <div class="text-xs text-light">{{ attempt.studentEmail }}</div>
+                            </td>
+                            <td class="font-bold"
+                                [style.color]="getPercentage(attempt) >= 60 ? 'var(--green)' : 'var(--red)'">
+                                {{ attempt.score }} / {{ attempt.totalQuestions }}
+                            </td>
+                            <td>
+                                <span class="badge" [class.badge-green]="getPercentage(attempt) >= 60"
+                                    [class.badge-red]="getPercentage(attempt) < 60">
+                                    {{ getPercentage(attempt) }}%
+                                </span>
+                            </td>
+                            <td class="text-mid">{{ formatTime(attempt.timeTaken) }}</td>
+                            <td>
+                                <span *ngIf="attempt.tabSwitchCount > 0"
+                                    style="background:#fee2e2; color:#dc2626; padding:2px 8px; border-radius:8px; font-size:12px; font-weight:600;">
+                                    ⚠️ {{ attempt.tabSwitchCount }}
+                                </span>
+                                <span *ngIf="!attempt.tabSwitchCount" class="text-light text-xs">0</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 📈 Per-Question Analytics -->
+        <div *ngIf="questionAnalytics.length > 0" class="glass-card overflow-hidden mb-8">
+            <div class="px-6 py-4"
+                style="border-bottom:1px solid #f1f5f9; background:linear-gradient(135deg, rgba(99,102,241,0.06), rgba(168,85,247,0.06));">
+                <div class="flex-between">
+                    <h3 class="font-bold text-dark">📈 Per-Question Analytics</h3>
+                    <span class="text-xs text-mid">{{ attempts.length }} responses analyzed</span>
+                </div>
+            </div>
+            <div class="p-6">
+                <div *ngFor="let qa of questionAnalytics; let i = index" style="margin-bottom:20px;">
+                    <div class="flex-between mb-2">
+                        <div class="flex items-center gap-2" style="max-width:60%;">
+                            <span class="text-xs text-mid font-bold">Q{{ i + 1 }}</span>
+                            <span class="text-sm font-medium text-dark"
+                                style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                {{ qa.text }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-xs font-bold" [style.color]="getDifficultyColor(qa.difficulty)"
+                                style="text-transform:uppercase;">
+                                {{ qa.difficulty }}
+                            </span>
+                            <span class="text-xs text-mid">⏱ {{ qa.avgTime }}s avg</span>
+                        </div>
+                    </div>
+                    <!-- Bar -->
+                    <div style="display:flex; height:24px; border-radius:8px; overflow:hidden; background:#f1f5f9;">
+                        <div [style.width.%]="qa.correctPercent"
+                            style="background:linear-gradient(90deg,#22c55e,#16a34a); display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; min-width:0; transition:width 0.5s ease;">
+                            <span *ngIf="qa.correctPercent >= 15">{{ qa.correctPercent }}% ✓</span>
+                        </div>
+                        <div [style.width.%]="100 - qa.correctPercent"
+                            style="background:linear-gradient(90deg,#fca5a5,#ef4444); display:flex; align-items:center; justify-content:center; color:#fff; font-size:11px; font-weight:700; min-width:0; transition:width 0.5s ease;">
+                            <span *ngIf="(100 - qa.correctPercent) >= 15">{{ 100 - qa.correctPercent }}% ✗</span>
+                        </div>
+                    </div>
+                    <div class="flex-between mt-1">
+                        <span class="text-xs text-green">{{ qa.correctCount }} correct</span>
+                        <span class="text-xs text-red">{{ qa.wrongCount }} wrong</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- No Attempts -->
+        <div *ngIf="attempts.length === 0" class="glass-card p-12 text-center">
+            <p class="text-mid text-lg">No students have completed this test yet.</p>
+            <p class="text-sm text-light mt-2">Share the link to get started.</p>
+        </div>
+
+        <!-- 📋 Detailed Attempts -->
+        <div *ngIf="attempts.length > 0" class="glass-card overflow-hidden">
+            <div class="px-6 py-4" style="border-bottom:1px solid #f1f5f9; background:rgba(248,250,252,0.5);">
+                <h3 class="font-bold text-dark">📋 Detailed Results</h3>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Email</th>
+                            <th>Score</th>
+                            <th>Percentage</th>
+                            <th>Time Taken</th>
+                            <th>Tab Switches</th>
+                            <th>Submitted</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <ng-container *ngFor="let attempt of attempts">
+                            <tr style="cursor:pointer;" (click)="toggleExpand(attempt._id)">
+                                <td class="font-bold">{{ attempt.studentName }}</td>
+                                <td class="text-mid">{{ attempt.studentEmail }}</td>
+                                <td>
+                                    <span class="font-bold"
+                                        [style.color]="getPercentage(attempt) >= 60 ? 'var(--green)' : 'var(--red)'">
+                                        {{ attempt.score }} / {{ attempt.totalQuestions }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge" [class.badge-green]="getPercentage(attempt) >= 60"
+                                        [class.badge-red]="getPercentage(attempt) < 60">
+                                        {{ getPercentage(attempt) }}%
+                                    </span>
+                                </td>
+                                <td class="text-mid">{{ formatTime(attempt.timeTaken) }}</td>
+                                <td>
+                                    <span *ngIf="attempt.tabSwitchCount > 0"
+                                        style="background:#fee2e2; color:#dc2626; padding:2px 8px; border-radius:8px; font-size:12px; font-weight:600;">
+                                        ⚠️ {{ attempt.tabSwitchCount }}
+                                    </span>
+                                    <span *ngIf="!attempt.tabSwitchCount" class="text-light text-xs">0</span>
+                                </td>
+                                <td class="text-mid text-sm">{{ attempt.endTime | date:'short' }}</td>
+                                <td>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none"
+                                        viewBox="0 0 24 24" stroke="currentColor"
+                                        [style.transform]="expandedAttempt === attempt._id ? 'rotate(180deg)' : 'rotate(0)'"
+                                        style="transition: transform 0.2s; color: var(--text-light);">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                </td>
+                            </tr>
+
+                            <!-- Expanded Detail -->
+                            <tr *ngIf="expandedAttempt === attempt._id">
+                                <td colspan="8" style="padding:0; background:rgba(248,250,252,0.6);">
+                                    <div class="p-6">
+                                        <h4 class="text-sm font-bold text-dark mb-4 uppercase tracking-wider">
+                                            Per-Question Breakdown</h4>
+                                        <table class="data-table" style="margin-bottom:0;">
+                                            <thead>
+                                                <tr>
+                                                    <th>#</th>
+                                                    <th>Question</th>
+                                                    <th>Student's Answer</th>
+                                                    <th>Correct Answer</th>
+                                                    <th>Time Spent</th>
+                                                    <th>Result</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr *ngFor="let ans of attempt.answers; let i = index">
+                                                    <td class="text-mid">{{ i + 1 }}</td>
+                                                    <td class="font-medium" style="max-width:300px;">{{
+                                                        getQuestionText(ans.questionId) }}</td>
+                                                    <td [style.color]="ans.isCorrect ? 'var(--green)' : 'var(--red)'"
+                                                        class="font-medium">
+                                                        {{ ans.selectedOption || '— skipped —' }}
+                                                    </td>
+                                                    <td class="text-green font-medium">{{
+                                                        getCorrectAnswer(ans.questionId) }}</td>
+                                                    <td class="text-mid">{{ formatTime(ans.timeSpent) }}</td>
+                                                    <td>
+                                                        <span *ngIf="ans.isCorrect" style="color:var(--green);">✓</span>
+                                                        <span *ngIf="!ans.isCorrect" style="color:var(--red);">✗</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        </ng-container>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

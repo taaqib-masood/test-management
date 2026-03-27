@@ -1,0 +1,13 @@
+{
+    "version": 2,
+    "rewrites": [
+        {
+            "source": "/api/(.*)",
+            "destination": "https://ltts-test-management-backend.onrender.com/api/$1"
+        },
+        {
+            "source": "/((?!api|.*\\..*).*)",
+            "destination": "/index.html"
+        }
+    ]
+}

@@ -1,0 +1,95 @@
+<div class="page-wrapper flex-center" style="min-height:100vh; padding:24px;">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Loading State -->
+    <div *ngIf="testLoading" class="flex-center flex-col z-10 relative">
+        <div class="spinner"></div>
+        <p class="text-mid font-medium mt-4">Loading test...</p>
+    </div>
+
+    <!-- Error without test -->
+    <div *ngIf="!testLoading && !testInfo" class="glass-card container-sm p-10 z-10 relative text-center">
+        <div style="color:var(--red); margin-bottom:16px;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor" style="margin:0 auto;">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+        </div>
+        <h2 class="text-2xl font-bold text-dark mb-2">Test Not Available</h2>
+        <p class="text-mid">{{ error || 'This test link is invalid or has expired.' }}</p>
+    </div>
+
+    <!-- Student Entry Form -->
+    <div *ngIf="!testLoading && testInfo" class="glass-card container-sm p-10 z-10 relative">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold gradient-text mb-2">{{ testInfo.title }}</h1>
+            <p class="text-mid font-medium">Enter your details to begin</p>
+        </div>
+
+        <div *ngIf="error" class="alert alert-error mb-6">
+            <span class="font-semibold">{{ error }}</span>
+        </div>
+
+        <!-- Test Info Pills -->
+        <div class="flex-center gap-3 mb-8 flex-wrap">
+            <span class="badge badge-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {{ testInfo.duration }} min
+            </span>
+            <span class="badge badge-primary">
+                {{ testInfo.totalQuestions }} Questions
+            </span>
+            <!-- ✅ FIX: was testInfo.hasAccessCode — backend returns requiresAccessCode -->
+            <span *ngIf="testInfo.requiresAccessCode" class="badge badge-red">
+                🔒 Access Code Required
+            </span>
+        </div>
+
+        <form (ngSubmit)="onSubmit()" style="display:flex; flex-direction:column; gap:20px;">
+            <div>
+                <label class="text-sm font-semibold text-mid" style="display:block; margin-bottom:6px;">Full
+                    Name</label>
+                <input name="studentName" type="text" required class="glass-input" placeholder="e.g. John Doe"
+                    [(ngModel)]="studentName" />
+            </div>
+            <div>
+                <label class="text-sm font-semibold text-mid" style="display:block; margin-bottom:6px;">Email
+                    Address</label>
+                <input name="studentEmail" type="email" required class="glass-input"
+                    placeholder="e.g. john@ltts.com" [(ngModel)]="studentEmail" />
+            </div>
+
+            <!-- ✅ FIX: was testInfo.hasAccessCode — now correctly uses requiresAccessCode -->
+            <div *ngIf="testInfo.requiresAccessCode">
+                <label class="text-sm font-semibold text-mid" style="display:block; margin-bottom:6px;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24"
+                        stroke="currentColor" style="display:inline; vertical-align:middle; margin-right:4px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                    Access Code
+                </label>
+                <input name="accessCode" type="text" class="glass-input"
+                    placeholder="Enter the access code provided by your instructor"
+                    [(ngModel)]="accessCode" />
+            </div>
+
+            <div style="padding-top:8px;">
+                <button type="submit" [disabled]="isLoading" class="btn btn-primary btn-full btn-lg">
+                    <span *ngIf="!isLoading">Continue to Instructions</span>
+                    <span *ngIf="isLoading" class="flex items-center gap-2">
+                        <span class="spinner spinner-sm"></span> Registering...
+                    </span>
+                </button>
+            </div>
+        </form>
+
+        <p class="text-center text-xs text-light mt-6">No account needed. Just enter your details to start the test.</p>
+    </div>
+</div>

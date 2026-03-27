@@ -1,0 +1,210 @@
+<div class="proctoring-dashboard">
+  <!-- Header -->
+  <div class="dashboard-header">
+    <h1>
+      <i class="fas fa-video"></i> Proctoring Dashboard
+    </h1>
+    <div class="header-actions">
+      <button class="btn btn-secondary" (click)="refresh()">
+        <i class="fas fa-sync"></i> Refresh
+      </button>
+      <button class="btn btn-primary" (click)="exportToCSV()">
+        <i class="fas fa-download"></i> Export CSV
+      </button>
+    </div>
+  </div>
+  
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-container">
+    <div class="spinner"></div>
+    <p>Loading proctoring data...</p>
+  </div>
+  
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-container">
+    <i class="fas fa-exclamation-circle"></i>
+    <p>{{ error }}</p>
+    <button class="btn btn-primary" (click)="refresh()">Try Again</button>
+  </div>
+  
+  <!-- Dashboard Content -->
+  <div *ngIf="!loading && !error">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon" style="background: #2196F3;">
+          <i class="fas fa-users"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.totalAttempts }}</div>
+          <div class="stat-label">Total Attempts</div>
+        </div>
+      </div>
+      
+      <div class="stat-card risk-high">
+        <div class="stat-icon" style="background: #F44336;">
+          <i class="fas fa-exclamation-triangle"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.highRiskCount }}</div>
+          <div class="stat-label">High Risk</div>
+        </div>
+      </div>
+      
+      <div class="stat-card risk-medium">
+        <div class="stat-icon" style="background: #FF9800;">
+          <i class="fas fa-exclamation-circle"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.mediumRiskCount }}</div>
+          <div class="stat-label">Medium Risk</div>
+        </div>
+      </div>
+      
+      <div class="stat-card risk-low">
+        <div class="stat-icon" style="background: #4CAF50;">
+          <i class="fas fa-check-circle"></i>
+        </div>
+        <div class="stat-content">
+          <div class="stat-value">{{ stats.lowRiskCount }}</div>
+          <div class="stat-label">Low Risk</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Violation Stats -->
+    <div class="violation-stats">
+      <h2>Violation Breakdown</h2>
+      <div class="violation-grid">
+        <div class="violation-item">
+          <i class="fas fa-window-restore"></i>
+          <span class="violation-count">{{ stats.violationStats.tabSwitches }}</span>
+          <span class="violation-label">Tab Switches</span>
+        </div>
+        <div class="violation-item">
+          <i class="fas fa-user-slash"></i>
+          <span class="violation-count">{{ stats.violationStats.noFace }}</span>
+          <span class="violation-label">No Face</span>
+        </div>
+        <div class="violation-item">
+          <i class="fas fa-users"></i>
+          <span class="violation-count">{{ stats.violationStats.multipleFaces }}</span>
+          <span class="violation-label">Multiple Faces</span>
+        </div>
+        <div class="violation-item">
+          <i class="fas fa-code"></i>
+          <span class="violation-count">{{ stats.violationStats.devTools }}</span>
+          <span class="violation-label">DevTools</span>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Filters -->
+    <div class="filters">
+      <div class="filter-buttons">
+        <button class="filter-btn" 
+                [class.active]="selectedRiskFilter === 'ALL'"
+                (click)="filterByRisk('ALL')">
+          All ({{ attempts.length }})
+        </button>
+        <button class="filter-btn risk-high" 
+                [class.active]="selectedRiskFilter === 'HIGH'"
+                (click)="filterByRisk('HIGH')">
+          High Risk ({{ stats.highRiskCount }})
+        </button>
+        <button class="filter-btn risk-medium" 
+                [class.active]="selectedRiskFilter === 'MEDIUM'"
+                (click)="filterByRisk('MEDIUM')">
+          Medium Risk ({{ stats.mediumRiskCount }})
+        </button>
+        <button class="filter-btn risk-low" 
+                [class.active]="selectedRiskFilter === 'LOW'"
+                (click)="filterByRisk('LOW')">
+          Low Risk ({{ stats.lowRiskCount }})
+        </button>
+      </div>
+    </div>
+    
+    <!-- Attempts Table -->
+    <div class="attempts-table" *ngIf="filteredAttempts.length > 0">
+      <table>
+        <thead>
+          <tr>
+            <th (click)="changeSortBy('student')">
+              Student
+              <i class="fas fa-sort"></i>
+            </th>
+            <th (click)="changeSortBy('suspicionScore')">
+              Suspicion Score
+              <i class="fas fa-sort"></i>
+            </th>
+            <th>Risk Level</th>
+            <th (click)="changeSortBy('violationCount')">
+              Violations
+              <i class="fas fa-sort"></i>
+            </th>
+            <th>Snapshots</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let attempt of filteredAttempts">
+            <td>
+              <div class="student-info">
+                <div class="student-avatar">
+                  {{ attempt.student.name.charAt(0) }}
+                </div>
+                <div>
+                  <div class="student-name">{{ attempt.student.name }}</div>
+                  <div class="student-email">{{ attempt.student.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="suspicion-score" 
+                   [style.color]="getRiskColor(attempt.riskLevel)">
+                <strong>{{ attempt.suspicionScore }}</strong>
+                <div class="score-bar">
+                  <div class="score-fill" 
+                       [style.width.%]="attempt.suspicionScore"
+                       [style.background]="getRiskColor(attempt.riskLevel)">
+                  </div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="risk-badge" 
+                    [style.background]="getRiskColor(attempt.riskLevel)">
+                {{ attempt.riskLevel }}
+              </span>
+            </td>
+            <td>
+              <span class="badge">{{ attempt.violationCount }}</span>
+            </td>
+            <td>
+              <span class="badge">{{ attempt.snapshotCount }}</span>
+            </td>
+            <td>
+              <span class="status-badge" 
+                    [class.auto-submitted]="attempt.autoSubmitted">
+                {{ attempt.autoSubmitted ? 'Auto-Submitted' : 'Completed' }}
+              </span>
+            </td>
+            <td>
+              <button class="view-btn" (click)="viewAttemptDetails(attempt.id)">
+                <i class="fas fa-eye"></i> View Details
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- No Results -->
+    <div *ngIf="filteredAttempts.length === 0" class="no-results">
+      <i class="fas fa-inbox"></i>
+      <p>No attempts found for this filter</p>
+    </div>
+  </div>
+</div>

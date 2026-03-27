@@ -1,0 +1,86 @@
+<div class="page-wrapper flex-center" style="min-height:100vh; padding:24px;">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+
+    <!-- Loading -->
+    <div *ngIf="loading" class="flex-center flex-col z-10">
+        <div class="spinner"></div>
+        <p class="text-mid font-medium mt-4">Loading...</p>
+    </div>
+
+    <!-- Error -->
+    <div *ngIf="!loading && error" class="glass-card container-sm p-10 z-10 relative text-center">
+        <h2 class="text-2xl font-bold text-red mb-2">Error</h2>
+        <p class="text-mid">{{ error }}</p>
+    </div>
+
+    <!-- Instructions -->
+    <div *ngIf="!loading && testInfo" class="glass-card container-sm p-10 z-10 relative">
+        <div class="text-center mb-8">
+            <h1 class="text-3xl font-extrabold gradient-text mb-2">{{ testInfo.title }}</h1>
+            <p class="text-mid font-medium">Assessment Instructions</p>
+        </div>
+
+        <!-- Test Details -->
+        <div class="flex-center gap-3 mb-8 flex-wrap">
+            <span class="badge badge-primary">⏱ {{ testInfo.duration }} min</span>
+            <span class="badge badge-primary">📝 {{ testInfo.totalQuestions }} questions</span>
+        </div>
+
+        <!-- Rules -->
+        <div
+            style="background:rgba(248,250,252,0.6); border-radius:var(--radius-md); padding:24px; margin-bottom:24px;">
+            <h3 class="font-bold text-dark mb-4">📋 Rules & Guidelines</h3>
+            <ul style="display:flex; flex-direction:column; gap:12px; color:var(--text-mid); font-size:14px;">
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">1.</span>
+                    This is a <strong>timed assessment</strong>. The timer starts once you click "Start".
+                </li>
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">2.</span>
+                    Questions include <strong>Multiple Choice (MCQ)</strong> and <strong>True/False</strong> types.
+                </li>
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">3.</span>
+                    You can navigate between questions using Previous/Next buttons.
+                </li>
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">4.</span>
+                    Your progress is <strong>auto-saved</strong> every 10 seconds.
+                </li>
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">5.</span>
+                    <strong>Do not switch tabs</strong> or exit the browser. This may auto-submit your test.
+                </li>
+                <li style="display:flex; gap:8px; align-items:flex-start;">
+                    <span style="color:var(--primary); font-weight:bold;">6.</span>
+                    When the timer runs out, the test is <strong>automatically submitted</strong>.
+                </li>
+            </ul>
+        </div>
+
+        <!-- Warning -->
+        <div
+            style="background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:24px;">
+            <div class="flex gap-3 items-center">
+                <span style="font-size:20px;">⚠️</span>
+                <p class="text-sm font-medium" style="color:#92400e;">
+                    Make sure you have a stable internet connection before starting.
+                </p>
+            </div>
+        </div>
+
+        <!-- Good Luck -->
+        <div class="text-center mb-8">
+            <p class="text-lg font-semibold text-dark">Good luck! 🍀</p>
+        </div>
+
+        <button (click)="startTest()" class="btn btn-primary btn-full btn-lg">
+            Start Assessment
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"
+                stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+        </button>
+    </div>
+</div>
