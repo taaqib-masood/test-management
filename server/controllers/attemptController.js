@@ -202,6 +202,8 @@ exports.saveProgress = async (req, res) => {
 exports.submitAttempt = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`[submitAttempt] called for attempt ${id}`);
+
     const {
       answers,
       autoSubmitted,
@@ -221,15 +223,18 @@ exports.submitAttempt = async (req, res) => {
     const test = await Test.findById(attempt.testId).populate('questions');
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
+    // Filter out null entries (deleted questions still referenced by test)
+    const validQuestions = (test.questions || []).filter(q => q != null);
+
     // ─── Ensure totalMarks is set (fallback to question count) ───────────────
     if (!attempt.totalMarks || attempt.totalMarks === 0) {
-      attempt.totalMarks = test.totalMarks || test.questions?.length || 1;
+      attempt.totalMarks = test.totalMarks || validQuestions.length || 1;
     }
 
     // ─── Grade answers ────────────────────────────────────────────────────────
     let score = 0;
     const gradedAnswers = (answers || []).map(userAnswer => {
-      const question = test.questions.find(
+      const question = validQuestions.find(
         q => q._id.toString() === userAnswer.questionId
       );
       const isCorrect = question
@@ -274,14 +279,14 @@ exports.submitAttempt = async (req, res) => {
       score,
       riskLevel,
       suspicionScore: finalScore,
-      percentage: test.totalMarks
-        ? Math.round((score / test.totalMarks) * 100)
+      percentage: attempt.totalMarks
+        ? Math.round((score / attempt.totalMarks) * 100)
         : 0
     });
 
   } catch (err) {
-    console.error('submitAttempt error:', err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('submitAttempt error:', err.message, err.stack);
+    res.status(500).json({ message: 'Server error', detail: err.message });
   }
 };
 
