@@ -214,8 +214,4 @@ function getViolationDescription(type) {
   return descriptions[type] || 'Violation detected';
 }
 
-module.exports = {
-  getProctoringOverview,
-  getAttemptProctoringDetails,
-  getFlaggedQuestionsReport
-};
+module.exports = {};
