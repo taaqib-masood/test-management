@@ -11,9 +11,13 @@ const { snapshotUpload } = attemptController;
 router.get('/user/:userId',   attemptController.getUserAttempts);
 router.get('/test/:testId',   attemptController.getTestAttempts);
 
+// Student entry endpoint — finds/creates user then creates attempt
+router.post('/start',         attemptController.startAttempt);
+
 router.post('/',              attemptController.createAttempt);
 router.get('/:id',            attemptController.getAttempt);
 router.put('/:id/submit',     attemptController.submitAttempt);
+router.post('/:id/submit',    attemptController.submitAttempt);   // frontend uses POST
 router.put('/:id/save',       attemptController.saveProgress);
 
 router.post('/:attemptId/violation',                    attemptController.logViolation);

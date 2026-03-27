@@ -167,10 +167,12 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             this.questionStartTime = Date.now();
             this.startTimer();
 
-            // Start proctoring only if enabled
-            if (this.antiCheatingEnabled) {
-              this.initProctoring();
-            }
+            // Always run non-webcam proctoring
+            this.setupFullscreen();
+            this.setupCopyPasteBlocker();
+            this.setupKeyboardBlocker();
+            this.setupDevToolsDetection();
+            // Webcam disabled — do not call startWebcam()
           },
           error: () => {
             alert('Failed to load questions.');

@@ -1,5 +1,7 @@
 const Attempt  = require('../models/Attempt');
 const Test     = require('../models/Test');
+const User     = require('../models/User');
+const bcrypt   = require('bcryptjs');
 const multer   = require('multer');
 const path     = require('path');
 const fs       = require('fs');
@@ -33,12 +35,14 @@ exports.createAttempt = async (req, res) => {
     const existing = await Attempt.findOne({ userId, testId, status: 'in-progress' });
     if (existing) return res.json({ success: true, attempt: existing });
 
+    const totalMarks = test.totalMarks || test.questions?.length || 1;
+
     const attempt = new Attempt({
       userId,
       testId,
-      totalMarks:  test.totalMarks,
-      startTime:   new Date(),
-      status:      'in-progress',
+      totalMarks,
+      startTime:      new Date(),
+      status:         'in-progress',
       suspicionScore: 0,
       violationLog:   [],
       violations:     [],
@@ -51,6 +55,80 @@ exports.createAttempt = async (req, res) => {
 
   } catch (err) {
     console.error('createAttempt error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  START ATTEMPT  (student entry — finds/creates user then creates attempt)
+//  Frontend POSTs: { testId, studentName, studentEmail, accessCode? }
+// ═══════════════════════════════════════════════════════════════════════════════
+
+exports.startAttempt = async (req, res) => {
+  try {
+    const { testId, studentName, studentEmail, accessCode } = req.body;
+
+    if (!testId || !studentName || !studentEmail) {
+      return res.status(400).json({ message: 'testId, studentName and studentEmail are required' });
+    }
+
+    const test = await Test.findById(testId).populate('questions');
+    if (!test)           return res.status(404).json({ message: 'Test not found' });
+    if (!test.isActive)  return res.status(400).json({ message: 'This test is not active' });
+
+    if (test.expiryDate && new Date() > new Date(test.expiryDate)) {
+      return res.status(400).json({ message: 'This test has expired' });
+    }
+
+    // Validate access code if required
+    if (test.accessCode && test.accessCode.trim()) {
+      if (!accessCode || accessCode.trim() !== test.accessCode.trim()) {
+        return res.status(400).json({ message: 'Invalid access code' });
+      }
+    }
+
+    // Find or create student user
+    let user = await User.findOne({ email: studentEmail.toLowerCase().trim() });
+    if (!user) {
+      const hashed = await bcrypt.hash(Math.random().toString(36) + Date.now(), 10);
+      user = await User.create({
+        name:     studentName.trim(),
+        email:    studentEmail.toLowerCase().trim(),
+        password: hashed,
+        role:     'student'
+      });
+    }
+
+    // Return existing in-progress attempt
+    const existing = await Attempt.findOne({ userId: user._id, testId, status: 'in-progress' });
+    if (existing) return res.json({ _id: existing._id, success: true, attempt: existing });
+
+    // Block retakes if not allowed
+    if (!test.allowMultipleAttempts) {
+      const done = await Attempt.findOne({ userId: user._id, testId, status: 'completed' });
+      if (done) return res.status(400).json({ message: 'You have already completed this test' });
+    }
+
+    const totalMarks = test.totalMarks || test.questions?.length || 1;
+
+    const attempt = new Attempt({
+      userId:         user._id,
+      testId,
+      totalMarks,
+      startTime:      new Date(),
+      status:         'in-progress',
+      suspicionScore: 0,
+      violationLog:   [],
+      violations:     [],
+      tabSwitchCount: 0,
+      answers:        []
+    });
+
+    await attempt.save();
+    res.json({ _id: attempt._id, success: true, attempt });
+
+  } catch (err) {
+    console.error('startAttempt error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -142,6 +220,11 @@ exports.submitAttempt = async (req, res) => {
 
     const test = await Test.findById(attempt.testId).populate('questions');
     if (!test) return res.status(404).json({ message: 'Test not found' });
+
+    // ─── Ensure totalMarks is set (fallback to question count) ───────────────
+    if (!attempt.totalMarks || attempt.totalMarks === 0) {
+      attempt.totalMarks = test.totalMarks || test.questions?.length || 1;
+    }
 
     // ─── Grade answers ────────────────────────────────────────────────────────
     let score = 0;

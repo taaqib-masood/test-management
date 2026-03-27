@@ -97,6 +97,13 @@ const getTests = async (req, res) => {
     const tests = await Test.find().sort({ createdAt: -1 });
 
     const testsWithStats = await Promise.all(tests.map(async (test) => {
+      // Patch old tests that were created before uniqueLink was added to schema
+      if (!test.uniqueLink) {
+        test.uniqueLink = Math.random().toString(36).substring(2, 10) +
+                          Math.random().toString(36).substring(2, 6);
+        await test.save();
+      }
+
       const attempts = await Attempt.find({ testId: test._id, status: 'completed' });
       const attemptCount = attempts.length;
       const avgScore = attemptCount > 0
@@ -186,7 +193,7 @@ const deleteTest = async (req, res) => {
   try {
     const test = await Test.findByIdAndDelete(req.params.id);
     if (!test) return res.status(404).json({ message: 'Test not found' });
-    await Attempt.deleteMany({ test: req.params.id });
+    await Attempt.deleteMany({ testId: req.params.id });
     res.json({ message: 'Test deleted successfully' });
   } catch (error) {
     console.error('Delete Test Error:', error);
@@ -264,10 +271,12 @@ const getTestQuestions = async (req, res) => {
     });
 
     res.json({
-      testId: test._id,
-      title: test.title,
-      duration: test.duration,
+      testId:        test._id,
+      title:         test.title,
+      duration:      test.duration,
       tabSwitchLimit: test.tabSwitchLimit !== undefined ? test.tabSwitchLimit : 3,
+      showResults:   test.showResults !== false,
+      antiCheating:  true,
       questions
     });
   } catch (error) {
