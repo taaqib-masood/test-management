@@ -10,14 +10,34 @@ const { parseExcelRequest } = require('../utils/excelParser');
 const uploadQuestions = async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
-    const questions = parseExcelRequest(req.file.buffer);
-    if (!questions || questions.length === 0) {
+    const parsed = parseExcelRequest(req.file.buffer);
+    if (!parsed || parsed.length === 0) {
       return res.status(400).json({ message: 'No valid questions found in file' });
     }
-    res.status(200).json(questions);
+
+    // Save questions to DB immediately
+    const withCreator = parsed.map(q => ({ ...q, createdBy: req.user?._id || null }));
+    const saved = await Question.insertMany(withCreator);
+
+    // If testId provided, link questions to that test
+    if (req.body.testId) {
+      const test = await Test.findById(req.body.testId);
+      if (test) {
+        const newIds = saved.map(q => q._id.toString());
+        test.questions = [...new Set([...test.questions.map(String), ...newIds])];
+        test.totalQuestions = test.questions.length;
+        await test.save();
+      }
+    }
+
+    res.status(200).json({
+      message: `${saved.length} questions uploaded successfully!`,
+      count: saved.length,
+      questionIds: saved.map(q => q._id)
+    });
   } catch (error) {
     console.error('Upload Questions Error:', error);
-    res.status(500).json({ message: 'Error parsing file' });
+    res.status(500).json({ message: 'Error parsing or saving file' });
   }
 };
 
@@ -77,10 +97,10 @@ const getTests = async (req, res) => {
     const tests = await Test.find().sort({ createdAt: -1 });
 
     const testsWithStats = await Promise.all(tests.map(async (test) => {
-      const attempts = await Attempt.find({ test: test._id, completed: true });
+      const attempts = await Attempt.find({ testId: test._id, status: 'completed' });
       const attemptCount = attempts.length;
       const avgScore = attemptCount > 0
-        ? Math.round(attempts.reduce((sum, a) => sum + ((a.score / a.totalQuestions) * 100), 0) / attemptCount)
+        ? Math.round(attempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / attemptCount)
         : 0;
       return { ...test.toObject(), attemptCount, avgScore };
     }));
