@@ -85,7 +85,7 @@ const createTest = async (req, res) => {
       shuffleOptions: shuffleOptions || false,
       showResults: showResults || false,
       allowMultipleAttempts: allowMultipleAttempts !== false,
-      accessCode: accessCode || '',
+      accessCode: (accessCode && accessCode.trim()) ? accessCode.trim() : null,
       expiryDate: expiryDate || null,
       tabSwitchLimit: tabSwitchLimit !== undefined ? tabSwitchLimit : 3,
       isActive: true,
@@ -168,7 +168,7 @@ const updateAccessCode = async (req, res) => {
     const test = await Test.findById(req.params.id);
     if (!test) return res.status(404).json({ message: 'Test not found' });
     const { accessCode } = req.body;
-    test.accessCode = accessCode && String(accessCode).trim() !== '' ? String(accessCode).trim() : '';
+    test.accessCode = accessCode && String(accessCode).trim() !== '' ? String(accessCode).trim() : null;
     await test.save();
     res.json({
       message: test.accessCode ? 'Access code updated' : 'Access code removed',

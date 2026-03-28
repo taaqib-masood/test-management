@@ -41,7 +41,9 @@ const testSchema = new mongoose.Schema({
   },
   accessCode: {
     type: String,
-    default: ''
+    unique: true,
+    sparse: true,   // sparse index ignores null — allows multiple tests with no access code
+    default: null
   },
   // Unique shareable link token
   uniqueLink: {
