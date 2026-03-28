@@ -58,6 +58,9 @@ const createQuestions = async (req, res) => {
 
 const createTest = async (req, res) => {
   try {
+    console.log('CREATE TEST HIT - body:', JSON.stringify(req.body));
+    console.log('CREATE TEST USER:', req.user);
+
     const {
       title, duration, questions, shuffleQuestions, shuffleOptions,
       showResults, allowMultipleAttempts, accessCode, expiryDate,
@@ -66,6 +69,11 @@ const createTest = async (req, res) => {
 
     if (!title || !duration) {
       return res.status(400).json({ message: 'Title and duration are required' });
+    }
+
+    if (!req.user || !req.user._id) {
+      console.error('CREATE TEST - req.user missing or has no _id:', req.user);
+      return res.status(401).json({ message: 'Authentication error: user not found' });
     }
 
     const test = await Test.create({
@@ -84,10 +92,11 @@ const createTest = async (req, res) => {
       createdBy: req.user._id
     });
 
+    console.log('CREATE TEST SUCCESS - id:', test._id, 'link:', test.uniqueLink);
     res.status(201).json(test);
   } catch (error) {
-    console.error('Create Test Error:', error);
-    res.status(500).json({ message: 'Error creating test' });
+    console.error('Create Test Error:', error.message, error.stack);
+    res.status(500).json({ message: error.message || 'Error creating test' });
   }
 };
 

@@ -220,9 +220,11 @@ export class CreateTestComponent implements OnInit {
                 this.isLoading = false;
                 this.createdLink = `${window.location.origin}/test/${data.uniqueLink}`;
             },
-            error: () => {
+            error: (err: any) => {
                 this.isLoading = false;
-                alert('Failed to create test');
+                console.error('Create test error:', err);
+                const msg = err?.error?.message || err?.message || 'Failed to create test';
+                alert('Failed to create test: ' + msg);
             }
         });
     }
