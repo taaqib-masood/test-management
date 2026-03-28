@@ -171,25 +171,29 @@ exports.saveProgress = async (req, res) => {
     const { id } = req.params;
     const { answers, tabSwitchCount, suspicionScore, violationLog } = req.body;
 
-    const attempt = await Attempt.findById(id);
-    if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
+    // Build only the fields that were actually sent
+    const fields = {};
+    if (answers        !== undefined) fields.answers        = answers;
+    if (tabSwitchCount !== undefined) fields.tabSwitchCount = tabSwitchCount;
+    if (suspicionScore !== undefined) fields.suspicionScore = suspicionScore;
+    if (violationLog   !== undefined) fields.violationLog   = violationLog;
 
-    // Only update if still in progress
-    if (attempt.status !== 'in-progress') {
-      return res.json({ success: true, message: 'Already submitted' });
+    // findOneAndUpdate is atomic — no version conflict with concurrent submitAttempt
+    const attempt = await Attempt.findOneAndUpdate(
+      { _id: id, status: 'in-progress' },
+      { $set: fields },
+      { new: false }
+    );
+
+    if (!attempt) {
+      // Either not found or already completed — both are fine, nothing to save
+      return res.json({ success: true, message: 'Already submitted or not found' });
     }
 
-    // ✅ Save all proctoring fields
-    if (answers          !== undefined) attempt.answers         = answers;
-    if (tabSwitchCount   !== undefined) attempt.tabSwitchCount  = tabSwitchCount;
-    if (suspicionScore   !== undefined) attempt.suspicionScore  = suspicionScore;
-    if (violationLog     !== undefined) attempt.violationLog    = violationLog;
-
-    await attempt.save();
     res.json({ success: true });
 
   } catch (err) {
-    console.error('saveProgress error:', err);
+    console.error('saveProgress error:', err.message);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -257,31 +261,46 @@ exports.submitAttempt = async (req, res) => {
       finalScore >= 71 ? 'HIGH'   :
       finalScore >= 31 ? 'MEDIUM' : 'LOW';
 
-    // ─── Persist everything ───────────────────────────────────────────────────
-    attempt.answers        = gradedAnswers;
-    attempt.score          = score;
-    attempt.endTime        = new Date();
-    attempt.timeTaken      = Math.floor((attempt.endTime - attempt.startTime) / 1000);
-    attempt.status         = 'completed';
+    // ─── Persist everything atomically (no version conflict with auto-save) ────
+    const endTime   = new Date();
+    const timeTaken = Math.floor((endTime - attempt.startTime) / 1000);
+    const percentage = attempt.totalMarks
+      ? Math.round((score / attempt.totalMarks) * 100)
+      : 0;
 
-    // ✅ These were missing before — root cause of "nothing saved to DB"
-    attempt.autoSubmitted  = autoSubmitted  ?? false;
-    attempt.tabSwitchCount = tabSwitchCount ?? attempt.tabSwitchCount ?? 0;
-    attempt.suspicionScore = finalScore;
-    attempt.violationLog   = violationLog   ?? attempt.violationLog   ?? [];
-    attempt.riskLevel      = riskLevel;
+    const saved = await Attempt.findOneAndUpdate(
+      { _id: id, status: 'in-progress' },
+      {
+        $set: {
+          answers:        gradedAnswers,
+          score,
+          percentage,
+          endTime,
+          timeTaken,
+          status:         'completed',
+          autoSubmitted:  autoSubmitted  ?? false,
+          tabSwitchCount: tabSwitchCount ?? attempt.tabSwitchCount ?? 0,
+          suspicionScore: finalScore,
+          violationLog:   violationLog   ?? attempt.violationLog   ?? [],
+          riskLevel
+        }
+      },
+      { new: true, runValidators: false }
+    );
 
-    await attempt.save();
+    if (!saved) {
+      // Already completed by a concurrent request — idempotent success
+      const existing = await Attempt.findById(id);
+      return res.json({ success: true, attempt: existing, score: existing?.score ?? 0 });
+    }
 
     res.json({
       success:    true,
-      attempt,
+      attempt:    saved,
       score,
       riskLevel,
       suspicionScore: finalScore,
-      percentage: attempt.totalMarks
-        ? Math.round((score / attempt.totalMarks) * 100)
-        : 0
+      percentage
     });
 
   } catch (err) {
