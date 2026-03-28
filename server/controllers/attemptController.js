@@ -206,9 +206,12 @@ exports.saveProgress = async (req, res) => {
 exports.submitAttempt = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log('SUBMIT HIT - attemptId:', id);
-    console.log('SUBMIT BODY:', JSON.stringify(req.body));
-    console.log('SUBMIT USER:', req.user || 'unauthenticated (expected for students)');
+    console.log('=== SUBMIT ATTEMPT CALLED ===');
+    console.log('Params:', req.params);
+    console.log('Body keys:', Object.keys(req.body || {}));
+    console.log('User:', req.user || null);
+    console.log('Headers auth:', req.headers.authorization ? 'PRESENT' : 'MISSING');
+    console.log('AttemptId value:', id, '| type:', typeof id);
 
     const {
       answers,
@@ -219,14 +222,17 @@ exports.submitAttempt = async (req, res) => {
     } = req.body;
 
     const attempt = await Attempt.findById(id);
+    console.log('Attempt lookup:', attempt ? `found (status=${attempt.status})` : 'NOT FOUND');
     if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
 
     // Prevent double-submit
     if (attempt.status === 'completed') {
+      console.log('Attempt already completed — returning cached result');
       return res.json({ success: true, attempt, score: attempt.score });
     }
 
     const test = await Test.findById(attempt.testId).populate('questions');
+    console.log('Test lookup:', test ? `found (${test.questions?.length} questions)` : 'NOT FOUND');
     if (!test) return res.status(404).json({ message: 'Test not found' });
 
     // Filter out null entries (deleted questions still referenced by test)

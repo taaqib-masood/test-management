@@ -319,6 +319,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     this.autoSaveSubscription?.unsubscribe();
     this.cleanupProctoring();
 
+    console.log('Submitting attempt:', this.attemptId, '| answers:', this.formatAnswers().length);
     this.http.post(`${this.apiUrl}/attempts/${this.attemptId}/submit`, {
       answers:         this.formatAnswers(),
       tabSwitchCount:  this.tabSwitchCount,
@@ -326,10 +327,15 @@ export class TestEngineComponent implements OnInit, OnDestroy {
       violationLog:    this.violationLog,
       autoSubmitted:   reason === 'AUTO'
     }).subscribe({
-      next: () => this.router.navigate(['/result', this.attemptId]),
-      error: () => {
+      next: (res: any) => {
+        console.log('Submit success:', res);
+        this.router.navigate(['/result', this.attemptId]);
+      },
+      error: (err: any) => {
+        console.error('Submit error - status:', err?.status, '| body:', err?.error);
         this.isSubmitting = false;
-        alert('Submission failed. Please try again.');
+        const msg = err?.error?.message || err?.error?.detail || err?.message || 'Unknown error';
+        alert(`Submission failed (${err?.status || 'network error'}): ${msg}`);
       }
     });
   }
