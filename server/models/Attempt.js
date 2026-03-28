@@ -79,9 +79,9 @@ const attemptSchema = new mongoose.Schema({
     details: String
   }],
 
-  // ✅ ADDED — frontend sends violationLog separately (richer format)
+  // ✅ FIXED — { type: String } looks like a SchemaType to Mongoose, so wrap it
   violationLog: [{
-    type:      String,
+    type:      { type: String },   // "type" field name wrapped to avoid Mongoose SchemaType confusion
     score:     Number,
     timestamp: Date
   }],
