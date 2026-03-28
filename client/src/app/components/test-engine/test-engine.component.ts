@@ -469,10 +469,11 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   // ─── Copy / Paste / Right-click ────────────────────────────────────────────
 
   private setupCopyPasteBlocker() {
-    document.addEventListener('copy',        this.onCopy.bind(this));
-    document.addEventListener('paste',       this.onPaste.bind(this));
-    document.addEventListener('cut',         this.onCopy.bind(this));
-    document.addEventListener('contextmenu', this.onRightClick.bind(this));
+    document.addEventListener('copy',  this.onCopy.bind(this));
+    document.addEventListener('paste', this.onPaste.bind(this));
+    document.addEventListener('cut',   this.onCopy.bind(this));
+    // contextmenu is handled by @HostListener('contextmenu') — do NOT add it here
+    // or onRightClick fires twice per right-click (+20 suspicion instead of +10)
   }
 
   private onCopy(e: Event)  { e.preventDefault(); this.handleViolation('COPY_ATTEMPT');  }

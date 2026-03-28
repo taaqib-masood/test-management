@@ -206,7 +206,9 @@ exports.saveProgress = async (req, res) => {
 exports.submitAttempt = async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`[submitAttempt] called for attempt ${id}`);
+    console.log('SUBMIT HIT - attemptId:', id);
+    console.log('SUBMIT BODY:', JSON.stringify(req.body));
+    console.log('SUBMIT USER:', req.user || 'unauthenticated (expected for students)');
 
     const {
       answers,
@@ -319,34 +321,38 @@ exports.logViolation = async (req, res) => {
     const { attemptId } = req.params;
     const { type, weight, suspicionScore, timestamp } = req.body;
 
-    const attempt = await Attempt.findById(attemptId);
-    if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
+    const violation = {
+      type,
+      weight:    weight || 0,
+      timestamp: timestamp ? new Date(timestamp) : new Date(),
+      severity:  getSeverity(type)
+    };
 
-    if (attempt.status !== 'in-progress') {
+    // Build atomic update — $push + $inc avoids VersionError from concurrent violations
+    const update = {
+      $push: { violations: violation }
+    };
+
+    // Trust the frontend's suspicion score
+    if (suspicionScore !== undefined) {
+      update.$set = { suspicionScore };
+    }
+
+    // $inc is safer than $set for a counter incremented by concurrent requests
+    if (type === 'TAB_SWITCH') {
+      update.$inc = { tabSwitchCount: 1 };
+    }
+
+    const attempt = await Attempt.findOneAndUpdate(
+      { _id: attemptId, status: 'in-progress' },
+      update,
+      { new: true, runValidators: false }
+    );
+
+    if (!attempt) {
       return res.json({ success: true, message: 'Already submitted' });
     }
 
-    // ✅ Push structured violation using fields frontend actually sends
-    attempt.violations.push({
-      type,
-      weight:    weight    || 0,
-      timestamp: timestamp ? new Date(timestamp) : new Date(),
-      severity:  getSeverity(type)
-    });
-
-    // ✅ Trust the frontend's calculated score (avoids mismatch)
-    if (suspicionScore !== undefined) {
-      attempt.suspicionScore = suspicionScore;
-    }
-
-    // Update tab switch count specifically
-    if (type === 'TAB_SWITCH') {
-      attempt.tabSwitchCount = (attempt.tabSwitchCount || 0) + 1;
-    }
-
-    await attempt.save();
-
-    // ✅ Safely check antiCheating — guard against null
     const shouldAutoSubmit = attempt.suspicionScore >= 100;
 
     res.json({
