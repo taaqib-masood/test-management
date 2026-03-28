@@ -205,55 +205,47 @@ exports.saveProgress = async (req, res) => {
 
 exports.submitAttempt = async (req, res) => {
   try {
-    const { id } = req.params;
     console.log('=== SUBMIT ATTEMPT CALLED ===');
     console.log('Params:', req.params);
     console.log('Body keys:', Object.keys(req.body || {}));
     console.log('User:', req.user || null);
     console.log('Headers auth:', req.headers.authorization ? 'PRESENT' : 'MISSING');
-    console.log('AttemptId value:', id, '| type:', typeof id);
 
-    const {
-      answers,
-      autoSubmitted,
-      tabSwitchCount,
-      suspicionScore,
-      violationLog
-    } = req.body;
+    const attempt = await Attempt.findById(req.params.id);
+    if (!attempt) {
+      console.log('Attempt not found:', req.params.id);
+      return res.status(404).json({ message: 'Attempt not found' });
+    }
+    console.log('Attempt found, status:', attempt.status);
 
-    const attempt = await Attempt.findById(id);
-    console.log('Attempt lookup:', attempt ? `found (status=${attempt.status})` : 'NOT FOUND');
-    if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
-
-    // Prevent double-submit
     if (attempt.status === 'completed') {
-      console.log('Attempt already completed — returning cached result');
-      return res.json({ success: true, attempt, score: attempt.score });
+      return res.json({ success: true, message: 'Already submitted' });
     }
 
     const test = await Test.findById(attempt.testId).populate('questions');
-    console.log('Test lookup:', test ? `found (${test.questions?.length} questions)` : 'NOT FOUND');
-    if (!test) return res.status(404).json({ message: 'Test not found' });
-
-    // Filter out null entries (deleted questions still referenced by test)
-    const validQuestions = (test.questions || []).filter(q => q != null);
-
-    // ─── Ensure totalMarks is set (fallback to question count) ───────────────
-    if (!attempt.totalMarks || attempt.totalMarks === 0) {
-      attempt.totalMarks = test.totalMarks || validQuestions.length || 1;
+    if (!test) {
+      console.log('Test not found:', attempt.testId);
+      return res.status(404).json({ message: 'Test not found' });
     }
+    console.log('Test found:', test.title, '| questions:', test.questions?.length);
 
-    // ─── Grade answers ────────────────────────────────────────────────────────
+    const {
+      answers      = [],
+      autoSubmitted = false,
+      suspicionScore = 0,
+      violationLog  = [],
+      tabSwitchCount = 0
+    } = req.body;
+
     let score = 0;
-    const gradedAnswers = (answers || []).map(userAnswer => {
-      const question = validQuestions.find(
-        q => q._id.toString() === userAnswer.questionId
+    const gradedAnswers = answers.map(userAnswer => {
+      const question = (test.questions || []).find(
+        q => q && q._id.toString() === String(userAnswer.questionId)
       );
       const isCorrect = question
         ? userAnswer.selectedOption === question.correctAnswer
         : false;
-      if (isCorrect) score += question.marks || 1;
-
+      if (isCorrect) score += (question.marks || 1);
       return {
         questionId:     userAnswer.questionId,
         selectedOption: userAnswer.selectedOption || null,
@@ -263,57 +255,46 @@ exports.submitAttempt = async (req, res) => {
       };
     });
 
-    // ─── Calculate risk level ─────────────────────────────────────────────────
-    const finalScore = suspicionScore || attempt.suspicionScore || 0;
-    const riskLevel  =
-      finalScore >= 71 ? 'HIGH'   :
-      finalScore >= 31 ? 'MEDIUM' : 'LOW';
+    const finalScore = suspicionScore || 0;
+    const riskLevel  = finalScore >= 71 ? 'HIGH' : finalScore >= 31 ? 'MEDIUM' : 'LOW';
 
-    // ─── Persist everything atomically (no version conflict with auto-save) ────
-    const endTime   = new Date();
-    const timeTaken = Math.floor((endTime - attempt.startTime) / 1000);
-    const percentage = attempt.totalMarks
-      ? Math.round((score / attempt.totalMarks) * 100)
-      : 0;
+    attempt.answers        = gradedAnswers;
+    attempt.score          = score;
+    attempt.endTime        = new Date();
+    attempt.timeTaken      = Math.floor((attempt.endTime - attempt.startTime) / 1000);
+    attempt.status         = 'completed';
+    attempt.autoSubmitted  = autoSubmitted;
+    attempt.suspicionScore = finalScore;
+    attempt.riskLevel      = riskLevel;
+    if (tabSwitchCount !== undefined) attempt.tabSwitchCount = tabSwitchCount;
+    if (violationLog && violationLog.length) attempt.violationLog = violationLog;
 
-    const saved = await Attempt.findOneAndUpdate(
-      { _id: id, status: 'in-progress' },
-      {
-        $set: {
-          answers:        gradedAnswers,
-          score,
-          percentage,
-          endTime,
-          timeTaken,
-          status:         'completed',
-          autoSubmitted:  autoSubmitted  ?? false,
-          tabSwitchCount: tabSwitchCount ?? attempt.tabSwitchCount ?? 0,
-          suspicionScore: finalScore,
-          violationLog:   violationLog   ?? attempt.violationLog   ?? [],
-          riskLevel
-        }
-      },
-      { new: true, runValidators: false }
-    );
+    // Recalculate percentage using actual question count
+    const totalMarks = attempt.totalMarks || test.questions?.length || 1;
+    attempt.totalMarks  = totalMarks;
+    attempt.percentage  = Math.round((score / totalMarks) * 100);
 
-    if (!saved) {
-      // Already completed by a concurrent request — idempotent success
-      const existing = await Attempt.findById(id);
-      return res.json({ success: true, attempt: existing, score: existing?.score ?? 0 });
-    }
+    await attempt.save();
+    console.log('Attempt saved successfully, score:', score);
 
     res.json({
-      success:    true,
-      attempt:    saved,
+      success:        true,
       score,
       riskLevel,
       suspicionScore: finalScore,
-      percentage
+      percentage:     attempt.percentage
     });
 
-  } catch (err) {
-    console.error('submitAttempt error:', err.message, err.stack);
-    res.status(500).json({ message: 'Server error', detail: err.message });
+  } catch (error) {
+    console.error('=== SUBMIT ERROR ===');
+    console.error('Message:', error.message);
+    console.error('Stack:', error.stack);
+    console.error('Name:', error.name);
+    res.status(500).json({
+      message: 'Server error',
+      detail:  error.message,
+      type:    error.name
+    });
   }
 };
 
