@@ -169,12 +169,13 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             this.questionStartTime = Date.now();
             this.startTimer();
 
-            // Always run non-webcam proctoring
+            // Non-webcam proctoring (always on)
             this.setupFullscreen();
             this.setupCopyPasteBlocker();
             this.setupKeyboardBlocker();
             this.setupDevToolsDetection();
-            // Webcam disabled — do not call startWebcam()
+            // Webcam + face detection
+            this.startWebcam();
           },
           error: () => {
             alert('Failed to load questions.');

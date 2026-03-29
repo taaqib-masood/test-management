@@ -8,7 +8,7 @@ import { ApiService } from '../../services/api.service';
     standalone: true,
     imports: [CommonModule],
     templateUrl: './test-results.component.html',
-    styleUrls: []
+    styleUrls: ['./test-results.component.css']
 })
 export class TestResultsComponent implements OnInit {
     testId = '';

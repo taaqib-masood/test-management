@@ -258,7 +258,8 @@ exports.submitAttempt = async (req, res) => {
         selectedOption: userAnswer.selectedOption || null,
         isAnswered:     !!userAnswer.selectedOption,
         timeSpent:      userAnswer.timeSpent || 0,
-        isCorrect
+        isCorrect,
+        isFlagged:      userAnswer.isFlagged || false
       };
     });
 

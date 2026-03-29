@@ -242,7 +242,7 @@
                                                     <td [style.color]="ans.isCorrect ? 'var(--green)' : 'var(--red)'"
                                                         class="font-medium">
                                                         {{ ans.selectedOption || '— skipped —' }}
-                                                        <span *ngIf="ans.isFlagged" style="color:#f59e0b; font-size:11px; margin-left:4px;">🚩</span>
+                                                        <span *ngIf="ans.isFlagged" class="flagged-badge">🚩 Flagged</span>
                                                     </td>
                                                     <td class="text-green font-medium">{{
                                                         getCorrectAnswer(ans.questionId) }}</td>
