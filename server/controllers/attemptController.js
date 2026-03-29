@@ -237,9 +237,13 @@ exports.submitAttempt = async (req, res) => {
       tabSwitchCount = 0
     } = req.body;
 
-    console.log('Sample answer from frontend:', JSON.stringify(answers[0]));
-    console.log('Sample question correctAnswer:', test.questions[0]?.correctAnswer);
-    console.log('Do they match?:', answers[0]?.selectedOption === test.questions[0]?.correctAnswer);
+    console.log('=== GRADING DEBUG ===');
+    console.log('Answers count:', answers.length);
+    console.log('Frontend selectedOption:', answers[0]?.selectedOption);
+    console.log('DB correctAnswer:', test.questions[0]?.correctAnswer);
+    console.log('Types:', typeof answers[0]?.selectedOption, typeof test.questions[0]?.correctAnswer);
+    console.log('Match result:', answers[0]?.selectedOption === test.questions[0]?.correctAnswer);
+    console.log('All options on Q0:', JSON.stringify(test.questions[0]?.options));
 
     let score = 0;
     const gradedAnswers = answers.map(userAnswer => {

@@ -28,6 +28,15 @@ router.get('/stats', protect, admin, async (req, res) => {
       ? Math.round(allAttempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / allAttempts.length)
       : 0;
 
+    // Debug: log first attempt's userId populate result
+    if (allAttempts.length > 0) {
+      const first = allAttempts[0];
+      console.log('=== STATS DEBUG ===');
+      console.log('First attempt userId raw:', first.userId);
+      console.log('First attempt userId type:', typeof first.userId);
+      console.log('First attempt name:', first.userId?.name);
+    }
+
     const recentAttempts = allAttempts.slice(0, 10).map(a => ({
       _id:        a._id,
       student:    a.userId?.name  || 'Unknown',
