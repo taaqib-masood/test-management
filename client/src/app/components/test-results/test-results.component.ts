@@ -84,6 +84,7 @@ export class TestResultsComponent implements OnInit {
     }
 
     getPercentage(attempt: any): number {
+        if (attempt.percentage != null) return attempt.percentage;
         return attempt.totalQuestions > 0 ? Math.round((attempt.score / attempt.totalQuestions) * 100) : 0;
     }
 

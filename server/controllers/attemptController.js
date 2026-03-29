@@ -237,6 +237,10 @@ exports.submitAttempt = async (req, res) => {
       tabSwitchCount = 0
     } = req.body;
 
+    console.log('Sample answer from frontend:', JSON.stringify(answers[0]));
+    console.log('Sample question correctAnswer:', test.questions[0]?.correctAnswer);
+    console.log('Do they match?:', answers[0]?.selectedOption === test.questions[0]?.correctAnswer);
+
     let score = 0;
     const gradedAnswers = answers.map(userAnswer => {
       const question = (test.questions || []).find(
