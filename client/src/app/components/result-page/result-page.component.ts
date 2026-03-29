@@ -47,8 +47,13 @@ export class ResultPageComponent implements OnInit {
 
                     this.loading = false;
 
-                    if (this.showResults && data.score !== undefined && data.totalQuestions > 0) {
-                        this.percentage = Math.round((data.score / data.totalQuestions) * 100);
+                    if (this.showResults && data.score !== undefined) {
+                        if (data.percentage != null) {
+                            this.percentage = data.percentage;
+                        } else {
+                            const total = data.totalMarks || data.totalQuestions || 1;
+                            this.percentage = Math.round((data.score / total) * 100);
+                        }
                         this.passed = this.percentage >= 60;
                     }
                 },

@@ -38,14 +38,15 @@ router.get('/stats', protect, admin, async (req, res) => {
     }
 
     const recentAttempts = allAttempts.slice(0, 10).map(a => ({
-      _id:        a._id,
-      student:    a.userId?.name  || 'Unknown',
-      email:      a.userId?.email || '',
-      testTitle:  a.testId?.title || 'Unknown Test',
-      score:      a.score,
-      percentage: a.percentage || 0,
-      riskLevel:  a.riskLevel  || 'LOW',
-      createdAt:  a.createdAt
+      _id:            a._id,
+      studentName:    a.userId?.name  || 'Unknown',
+      email:          a.userId?.email || '',
+      test:           { title: a.testId?.title || 'Unknown Test' },
+      score:          a.score         || 0,
+      totalQuestions: a.totalMarks    || 0,
+      percentage:     a.percentage    || 0,
+      riskLevel:      a.riskLevel     || 'LOW',
+      createdAt:      a.createdAt
     }));
 
     res.json({

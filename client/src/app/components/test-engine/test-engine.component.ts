@@ -16,7 +16,7 @@ const VIOLATION_WEIGHTS: Record<string, number> = {
   COPY_ATTEMPT:    40,
   PASTE_ATTEMPT:   40,
   RIGHT_CLICK:     10,
-  DEV_TOOLS:       50,
+  DEV_TOOLS:       0,   // disabled
   FULLSCREEN_EXIT: 20,
 };
 
@@ -494,37 +494,17 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   // ─── Keyboard blocker (F12, Ctrl+Shift+I, etc.) ───────────────────────────
 
   private setupKeyboardBlocker() {
-    document.addEventListener('keydown', this.onKeyDown.bind(this));
+    // DevTools keyboard shortcuts detection disabled
   }
 
   private onKeyDown(e: KeyboardEvent) {
-    const blocked =
-      e.key === 'F12' ||
-      (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key)) ||
-      (e.ctrlKey && e.key === 'U');
-
-    if (blocked) {
-      e.preventDefault();
-      this.handleViolation('DEV_TOOLS');
-    }
+    // DevTools keyboard detection disabled
   }
 
   // ─── DevTools size detection ───────────────────────────────────────────────
 
   private setupDevToolsDetection() {
-    this.devToolsInterval = setInterval(() => {
-      const threshold = 160;
-      const widthDiff  = window.outerWidth  - window.innerWidth  > threshold;
-      const heightDiff = window.outerHeight - window.innerHeight > threshold;
-      const isOpen     = widthDiff || heightDiff;
-
-      if (isOpen && !this.devToolsOpen) {
-        this.devToolsOpen = true;
-        this.handleViolation('DEV_TOOLS');
-      } else if (!isOpen) {
-        this.devToolsOpen = false;
-      }
-    }, 1000);
+    // DevTools size detection disabled
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
