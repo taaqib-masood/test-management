@@ -117,14 +117,6 @@
                                 [class.btn-ghost]="tabSwitchMode !== 'limit'">
                                 ⚠️ Limit & Auto-submit
                             </button>
-                            <!-- Block -->
-                            <button type="button" (click)="tabSwitchMode = 'block'"
-                                class="btn btn-sm"
-                                [style.background]="tabSwitchMode === 'block' ? 'var(--red)' : ''"
-                                [style.color]="tabSwitchMode === 'block' ? '#fff' : ''"
-                                [class.btn-ghost]="tabSwitchMode !== 'block'">
-                                🚫 Block Completely
-                            </button>
                         </div>
 
                         <!-- Off description -->
@@ -149,12 +141,6 @@
                             </div>
                         </div>
 
-                        <!-- Block description -->
-                        <div *ngIf="tabSwitchMode === 'block'"
-                            style="background:rgba(239,68,68,0.06); border-radius:8px; padding:12px 16px;">
-                            <p class="text-sm text-dark font-medium mb-1">🚫 Tab switching is completely blocked.</p>
-                            <p class="text-sm text-mid">When the student tries to switch tabs or windows, focus is immediately returned to the test. The test is <strong>not</strong> auto-submitted — they are simply prevented from leaving.</p>
-                        </div>
                     </div>
 
                     <!-- ── Difficulty Distribution + Category Filter ── -->

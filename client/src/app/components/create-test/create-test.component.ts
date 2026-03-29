@@ -39,7 +39,7 @@ export class CreateTestComponent implements OnInit {
     //   'off'   = no restriction
     //   'limit' = auto-submit after N switches
     //   'block' = prevent switching entirely (no submit, just blocked)
-    tabSwitchMode: 'off' | 'limit' | 'block' = 'limit';
+    tabSwitchMode: 'off' | 'limit' = 'limit';
     tabSwitchLimit: number = 3;
 
     isLoading = false;
@@ -190,7 +190,6 @@ export class CreateTestComponent implements OnInit {
     //    N = auto-submit after N switches
     get resolvedTabSwitchLimit(): number {
         if (this.tabSwitchMode === 'off') return 0;
-        if (this.tabSwitchMode === 'block') return -1;
         return Math.max(1, this.tabSwitchLimit);
     }
 

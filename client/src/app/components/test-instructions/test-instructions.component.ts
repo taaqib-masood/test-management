@@ -8,7 +8,8 @@ import { environment } from '../../../environments/environment';
     selector: 'app-test-instructions',
     standalone: true,
     imports: [CommonModule],
-    templateUrl: './test-instructions.component.html'
+    templateUrl: './test-instructions.component.html',
+    styleUrls: ['./test-instructions.css']
 })
 export class TestInstructionsComponent implements OnInit {
     testInfo: any = null;

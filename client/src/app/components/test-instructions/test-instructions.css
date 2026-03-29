@@ -1,0 +1,29 @@
+.rules-container {
+  padding: 24px;
+  background: #f8f9ff;
+  border-radius: 12px;
+}
+
+.rules-container h2 {
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 16px;
+}
+
+.rules-list {
+  list-style: decimal;
+  padding-left: 20px;
+  line-height: 1.8;
+}
+
+.rules-list li {
+  margin-bottom: 12px;
+  font-size: 15px;
+  color: #333;
+}
+
+.rules-list strong {
+  color: #2196f3;
+  font-weight: 700;
+}
