@@ -239,11 +239,10 @@ exports.submitAttempt = async (req, res) => {
 
     console.log('=== GRADING DEBUG ===');
     console.log('Answers count:', answers.length);
-    console.log('Frontend selectedOption:', answers[0]?.selectedOption);
-    console.log('DB correctAnswer:', test.questions[0]?.correctAnswer);
-    console.log('Types:', typeof answers[0]?.selectedOption, typeof test.questions[0]?.correctAnswer);
-    console.log('Match result:', answers[0]?.selectedOption === test.questions[0]?.correctAnswer);
-    console.log('All options on Q0:', JSON.stringify(test.questions[0]?.options));
+    answers.forEach((userAnswer, i) => {
+      const question = test.questions.find(q => q._id.toString() === String(userAnswer.questionId));
+      console.log(`Q${i+1}: selected="${userAnswer.selectedOption}" correct="${question?.correctAnswer}" match=${userAnswer.selectedOption === question?.correctAnswer}`);
+    });
 
     let score = 0;
     const gradedAnswers = answers.map(userAnswer => {
@@ -288,9 +287,12 @@ exports.submitAttempt = async (req, res) => {
     res.json({
       success:        true,
       score,
+      totalMarks,
+      percentage:     attempt.percentage,
+      correctCount:   gradedAnswers.filter(a => a.isCorrect).length,
+      incorrectCount: gradedAnswers.filter(a => !a.isCorrect).length,
       riskLevel,
-      suspicionScore: finalScore,
-      percentage:     attempt.percentage
+      suspicionScore: finalScore
     });
 
   } catch (error) {

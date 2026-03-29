@@ -341,11 +341,16 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   }
 
   private formatAnswers() {
-    return Object.keys(this.answers).map(qId => {
+    const allQIds = new Set([
+      ...Object.keys(this.answers),
+      ...Array.from(this.flaggedQuestions)
+    ]);
+    return Array.from(allQIds).map(qId => {
       const q = this.questions.find(fq => fq._id === qId);
       return {
         questionId:     qId,
-        selectedOption: q ? q.options[this.answers[qId]] : null,
+        selectedOption: q && this.answers[qId] !== undefined ? q.options[this.answers[qId]] : null,
+        isFlagged:      this.flaggedQuestions.has(qId),
         timeSpent:      this.questionTimes[qId] || 0
       };
     });

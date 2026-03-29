@@ -28,6 +28,7 @@ export class ResultPageComponent implements OnInit {
             this.http.get(`${this.apiUrl}/attempts/${attemptId}`).subscribe({
                 next: (data: any) => {
                     this.result = data;
+                    this.result.studentName = data.userId?.name || 'Student';
 
                     // ✅ FIX: showResults lives on the Test, not the Attempt
                     // attemptController.getAttempt populates test with 'title duration showResults'
@@ -107,7 +108,7 @@ export class ResultPageComponent implements OnInit {
                 <p class="detail">on ${date}</p>
                 <div class="score-box">
                     <div class="score-val">${this.percentage}%</div>
-                    <div class="score-label">Score: ${r.score} / ${r.totalQuestions} • Time: ${timeMins}m ${timeSecs}s</div>
+                    <div class="score-label">Score: ${r.score} / ${r.totalMarks || 0} • Time: ${timeMins}m ${timeSecs}s</div>
                 </div>
                 <p class="status">${this.passed ? '✓ PASSED' : '✗ NEEDS IMPROVEMENT'}</p>
                 <div class="seal">${this.passed ? '🏆' : '📋'}</div>
