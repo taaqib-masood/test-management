@@ -57,6 +57,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   showNavPanel = false;
 
   // ─── Proctoring state ───────────────────────────────────────────────────────
+  maxTabSwitches   = 3;
   suspicionScore   = 0;
   violationLog:    { type: string; timestamp: Date; score: number }[] = [];
   tabSwitchCount   = 0;
@@ -148,6 +149,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             this.testTitle          = data.title;
             this.questions          = data.questions;
             this.antiCheatingEnabled = !!data.antiCheating;
+            this.maxTabSwitches     = Math.max(1, data.tabSwitchLimit ?? 3);
             this.timeLeft = Math.max(
               0,
               data.duration * 60 - Math.floor((Date.now() - startTime) / 1000)
@@ -467,6 +469,19 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     if (document.hidden && !this.isSubmitting) {
       this.tabSwitchCount++;
       this.handleViolation('TAB_SWITCH');
+
+      const limit = this.maxTabSwitches < 1 ? 1 : this.maxTabSwitches;
+
+      if (this.tabSwitchCount >= limit) {
+        this.showWarning(
+          `⚠️ Maximum tab switches reached (${this.tabSwitchCount}/${limit}). Auto-submitting now...`
+        );
+        setTimeout(() => this.autoSubmit(), 1500);
+      } else {
+        this.showWarning(
+          `⚠️ Tab switch detected! ${this.tabSwitchCount}/${limit} — test will auto-submit at ${limit} switches.`
+        );
+      }
     }
   }
 
@@ -474,6 +489,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   windowBlur() {
     if (!this.isSubmitting) {
       this.handleViolation('WINDOW_BLUR');
+      // Note: window blur only logs a violation — auto-submit is triggered by tab switches only
     }
   }
 

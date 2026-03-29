@@ -134,6 +134,129 @@ router.get('/tests/:id/export', protect, admin, async (req, res) => {
   }
 });
 
+// ─── GET /api/admin/analytics ────────────────────────────────────────────────
+router.get('/analytics', protect, admin, async (req, res) => {
+  try {
+    const { testIds, cutoff = '60' } = req.query;
+    const cutoffNum = parseInt(cutoff, 10) || 60;
+
+    // No testIds → return test list for the selector dropdown
+    if (!testIds) {
+      const tests = await Test.find().sort({ createdAt: -1 }).select('_id title');
+      return res.json({ tests });
+    }
+
+    const ids = String(testIds).split(',').filter(Boolean);
+
+    const attempts = await Attempt.find({ testId: { $in: ids }, status: 'completed' })
+      .populate('userId', 'name email')
+      .populate('testId', 'title')
+      .sort({ createdAt: 1 });
+
+    // ── Summary ──
+    const uniqueStudentIds = new Set(attempts.map(a => a.userId?._id?.toString()).filter(Boolean));
+    const totalAttempts = attempts.length;
+    const avgScore  = totalAttempts > 0 ? Math.round(attempts.reduce((s, a) => s + (a.percentage || 0), 0) / totalAttempts) : 0;
+    const avgTime   = totalAttempts > 0 ? Math.round(attempts.reduce((s, a) => s + (a.timeTaken  || 0), 0) / totalAttempts) : 0;
+    const passCount = attempts.filter(a => (a.percentage || 0) >= cutoffNum).length;
+
+    // ── Score Distribution (10 buckets) ──
+    const scoreDistribution = Array.from({ length: 10 }, (_, i) => ({
+      range: i === 0 ? '0-10' : `${i * 10 + 1}-${(i + 1) * 10}`,
+      count: 0
+    }));
+    attempts.forEach(a => {
+      const pct = Math.min(100, Math.max(0, a.percentage || 0));
+      scoreDistribution[pct === 100 ? 9 : Math.floor(pct / 10)].count++;
+    });
+
+    // ── Performance Over Time ──
+    const dateMap = {};
+    attempts.forEach(a => {
+      const date = (a.endTime || a.createdAt)?.toISOString?.()?.split('T')[0];
+      if (!date) return;
+      if (!dateMap[date]) dateMap[date] = { total: 0, count: 0 };
+      dateMap[date].total += a.percentage || 0;
+      dateMap[date].count++;
+    });
+    const performanceOverTime = Object.keys(dateMap).sort().map(date => ({
+      date,
+      avgScore: Math.round(dateMap[date].total / dateMap[date].count),
+      attempts: dateMap[date].count
+    }));
+
+    // ── Per-Test breakdown ──
+    const perTest = (await Promise.all(ids.map(async testId => {
+      const test = await Test.findById(testId).populate('questions');
+      if (!test) return null;
+
+      const ta = attempts.filter(a => {
+        const tid = a.testId?._id ? a.testId._id.toString() : a.testId?.toString();
+        return tid === testId;
+      });
+
+      const testTotal = ta.length;
+      const testAvg   = testTotal > 0 ? Math.round(ta.reduce((s, a) => s + (a.percentage || 0), 0) / testTotal) : 0;
+      const testPass  = ta.filter(a => (a.percentage || 0) >= cutoffNum).length;
+
+      const questions = (test.questions || []).map(q => {
+        let correct = 0, totalTime = 0, answered = 0;
+        ta.forEach(attempt => {
+          const ans = attempt.answers?.find(a => a.questionId?.toString() === q._id.toString());
+          if (ans) { answered++; if (ans.isCorrect) correct++; totalTime += ans.timeSpent || 0; }
+        });
+        return {
+          _id: q._id,
+          text: q.text,
+          difficulty: q.difficulty || 'medium',
+          correctPercent: answered > 0 ? Math.round((correct / answered) * 100) : 0,
+          totalAttempts: answered,
+          avgTime: answered > 0 ? Math.round(totalTime / answered) : 0
+        };
+      });
+
+      const heatmapGrid = ['easy', 'medium', 'hard'].map(diff => {
+        const buckets = [0, 0, 0, 0, 0];
+        questions.filter(q => q.difficulty === diff).forEach(q => {
+          const p = q.correctPercent;
+          buckets[p <= 20 ? 0 : p <= 40 ? 1 : p <= 60 ? 2 : p <= 80 ? 3 : 4]++;
+        });
+        return { difficulty: diff, buckets };
+      });
+
+      return { testId, testTitle: test.title, totalAttempts: testTotal, avgScore: testAvg, passCount: testPass, failCount: testTotal - testPass, heatmapGrid, questions };
+    }))).filter(Boolean);
+
+    // ── Top Students ──
+    const studentMap = {};
+    attempts.forEach(a => {
+      const uid = a.userId?._id?.toString();
+      if (!uid) return;
+      if (!studentMap[uid]) studentMap[uid] = { studentName: a.userId?.name || 'Unknown', studentEmail: a.userId?.email || '', totalScore: 0, count: 0, bestScore: 0 };
+      const pct = a.percentage || 0;
+      studentMap[uid].totalScore += pct;
+      studentMap[uid].count++;
+      if (pct > studentMap[uid].bestScore) studentMap[uid].bestScore = pct;
+    });
+    const topStudents = Object.values(studentMap)
+      .map(s => ({ ...s, avgScore: Math.round(s.totalScore / s.count), testsTaken: s.count }))
+      .sort((a, b) => b.avgScore - a.avgScore)
+      .slice(0, 10);
+
+    res.json({
+      summary: { totalAttempts, uniqueStudents: uniqueStudentIds.size, avgScore, avgTime, passCount, failCount: totalAttempts - passCount },
+      scoreDistribution,
+      performanceOverTime,
+      perTest,
+      topStudents
+    });
+
+  } catch (err) {
+    console.error('Analytics error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // ─── GET /api/admin/sample-template ─────────────────────────────────────────
 router.get('/sample-template', protect, admin, (req, res) => {
   try {
