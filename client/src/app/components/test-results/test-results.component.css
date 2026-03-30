@@ -8,3 +8,43 @@
   margin-left: 8px;
   white-space: nowrap;
 }
+
+/* ── Proctoring Report section ─────────────────────────────────────────── */
+.proctoring-summary {
+  background: #f8fafc;
+  border-radius: 10px;
+  padding: 16px 20px;
+  border-left: 4px solid #6366f1;
+}
+
+.risk-badge {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid currentColor;
+}
+.risk-low    { color: #16a34a; background: #f0fdf4; }
+.risk-medium { color: #d97706; background: #fffbeb; }
+.risk-high   { color: #dc2626; background: #fef2f2; }
+
+.auto-submitted-badge {
+  background: #fff3e0;
+  color: #e65100;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.severity-badge {
+  padding: 2px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.sev-low      { background: #f0fdf4; color: #16a34a; }
+.sev-medium   { background: #fffbeb; color: #d97706; }
+.sev-high     { background: #fef2f2; color: #dc2626; }
+.sev-critical { background: #4c0519; color: #fecdd3; }

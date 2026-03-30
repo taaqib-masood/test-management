@@ -66,6 +66,10 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   isSubmitting     = false;
   antiCheatingEnabled = false;
 
+  // ─── Initialization guard (webcam popup + fullscreen request can blur window) ──
+  isSystemInitializing = true;
+  private initializationGrace = 15000;
+
   // ─── Webcam / face detection ─────────────────────────────────────────────
   @ViewChild('videoElement') videoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvasElement') canvasRef!: ElementRef<HTMLCanvasElement>;
@@ -119,6 +123,9 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     // This ensures the browser permission popup fires before violations are tracked.
     // loadFaceApiAndMonitor() is called once the video is actually playing.
     this.startWebcam();
+
+    // Clear initialization guard after grace period (webcam popup + fullscreen can blur)
+    setTimeout(() => { this.isSystemInitializing = false; }, this.initializationGrace);
 
     this.loadAttemptAndQuestions();
 
@@ -373,6 +380,8 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
   handleViolation(type: string) {
     if (this.isSubmitting) return;
+    // Suppress focus-loss violations while system is initializing (webcam popup, fullscreen)
+    if (this.isSystemInitializing && (type === 'WINDOW_BLUR' || type === 'FULLSCREEN_EXIT')) return;
 
     const weight    = VIOLATION_WEIGHTS[type] ?? 10;
     const prevScore = this.suspicionScore;
@@ -478,7 +487,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
   @HostListener('document:visibilitychange')
   visibilityChange() {
-    if (document.hidden && !this.isSubmitting) {
+    if (document.hidden && !this.isSubmitting && !this.isSystemInitializing) {
       this.tabSwitchCount++;
       this.handleViolation('TAB_SWITCH');
 
@@ -499,7 +508,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
   @HostListener('window:blur')
   windowBlur() {
-    if (!this.isSubmitting) {
+    if (!this.isSubmitting && !this.isSystemInitializing) {
       this.handleViolation('WINDOW_BLUR');
       // Note: window blur only logs a violation — auto-submit is triggered by tab switches only
     }

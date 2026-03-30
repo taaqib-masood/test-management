@@ -221,7 +221,61 @@
                             <tr *ngIf="expandedAttempt === attempt._id">
                                 <td colspan="8" style="padding:0; background:rgba(248,250,252,0.6);">
                                     <div class="p-6">
-                                        <h4 class="text-sm font-bold text-dark mb-4 uppercase tracking-wider">
+                                        <!-- 🔒 Proctoring Report -->
+                        <div class="proctoring-summary mb-6">
+                            <h4 class="text-sm font-bold text-dark mb-3 uppercase tracking-wider">🔒 Proctoring Report</h4>
+                            <div class="flex gap-4 flex-wrap mb-3">
+                                <span class="risk-badge"
+                                    [class.risk-low]="(attempt.riskLevel || 'LOW') === 'LOW'"
+                                    [class.risk-medium]="attempt.riskLevel === 'MEDIUM'"
+                                    [class.risk-high]="attempt.riskLevel === 'HIGH'">
+                                    Risk: {{ attempt.riskLevel || 'LOW' }}
+                                </span>
+                                <span class="text-sm text-mid">Suspicion Score: <strong>{{ attempt.suspicionScore || 0 }}</strong>/100</span>
+                                <span class="text-sm text-mid">Tab Switches: <strong>{{ attempt.tabSwitchCount || 0 }}</strong></span>
+                                <span class="text-sm text-mid">📸 Snapshots: <strong>{{ attempt.snapshots?.length || 0 }}</strong></span>
+                            </div>
+                            <div *ngIf="attempt.autoSubmitted" class="auto-submitted-badge mb-3">
+                                ⚠️ Test was AUTO-SUBMITTED due to violations
+                            </div>
+                            <div *ngIf="attempt.violations?.length > 0">
+                                <p class="text-xs font-bold text-mid uppercase mb-2">Violation Log ({{ attempt.violations.length }} events)</p>
+                                <div class="overflow-x-auto">
+                                    <table class="data-table" style="margin-bottom:0;">
+                                        <thead>
+                                            <tr>
+                                                <th>Type</th>
+                                                <th>Severity</th>
+                                                <th>Points</th>
+                                                <th>Time</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr *ngFor="let v of attempt.violations">
+                                                <td class="font-medium">{{ v.type }}</td>
+                                                <td>
+                                                    <span class="severity-badge"
+                                                        [class.sev-low]="v.severity === 'LOW'"
+                                                        [class.sev-medium]="v.severity === 'MEDIUM'"
+                                                        [class.sev-high]="v.severity === 'HIGH'"
+                                                        [class.sev-critical]="v.severity === 'CRITICAL'">
+                                                        {{ v.severity || 'MEDIUM' }}
+                                                    </span>
+                                                </td>
+                                                <td class="text-mid">+{{ v.weight || 0 }}</td>
+                                                <td class="text-mid text-xs">{{ v.timestamp | date:'HH:mm:ss' }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div *ngIf="!attempt.violations || attempt.violations.length === 0"
+                                style="color:var(--green); font-size:13px; font-weight:600;">
+                                ✅ No violations recorded
+                            </div>
+                        </div>
+
+                        <h4 class="text-sm font-bold text-dark mb-4 uppercase tracking-wider">
                                             Per-Question Breakdown</h4>
                                         <table class="data-table" style="margin-bottom:0;">
                                             <thead>

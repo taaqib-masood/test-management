@@ -86,7 +86,10 @@ router.get('/tests/:id/results', protect, admin, async (req, res) => {
       riskLevel:     a.riskLevel     || 'LOW',
       autoSubmitted: a.autoSubmitted || false,
       endTime:       a.endTime,
-      answers:       a.answers       || []
+      answers:       a.answers       || [],
+      violations:    a.violations    || [],
+      violationLog:  a.violationLog  || [],
+      snapshots:     (a.snapshots    || []).map(s => ({ label: s.label, filename: s.filename, timestamp: s.timestamp }))
     }));
 
     res.json({ test, attempts: formattedAttempts });
