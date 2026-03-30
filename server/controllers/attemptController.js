@@ -8,7 +8,10 @@ const multer   = require('multer');
 // memoryStorage keeps the file in req.file.buffer — no disk writes.
 // This is required for Render (ephemeral filesystem) and lets us store
 // snapshots as base64 in MongoDB so they survive redeploys.
-const snapshotUpload = multer({ storage: multer.memoryStorage() });
+const snapshotUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }  // 2 MB max per snapshot
+});
 exports.snapshotUpload = snapshotUpload; // used in routes
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -367,10 +370,15 @@ exports.uploadSnapshot = async (req, res) => {
     const { attemptId } = req.params;
     const label         = req.body.label || 'PERIODIC';
 
-    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+    console.log(`[SNAPSHOT] label=${label} | file=${req.file ? 'EXISTS' : 'MISSING'} | size=${req.file?.size ?? 0} | buffer=${req.file?.buffer ? 'HAS BUFFER' : 'NO BUFFER'}`);
+
+    if (!req.file || !req.file.buffer) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
 
     const imageData = req.file.buffer.toString('base64');
     const filename  = `${attemptId}_${Date.now()}.jpg`;
+    console.log(`[SNAPSHOT] base64 length=${imageData.length}`);
 
     // $push atomically appends the snapshot; avoids VersionError from concurrent saves
     await Attempt.findByIdAndUpdate(attemptId, {

@@ -252,7 +252,15 @@
                                         </thead>
                                         <tbody>
                                             <tr *ngFor="let v of attempt.violations">
-                                                <td class="font-medium">{{ v.type }}</td>
+                                                <td>
+                                                    <span class="violation-type-label"
+                                                        [class.sev-critical]="v.severity === 'CRITICAL'"
+                                                        [class.sev-high]="v.severity === 'HIGH'"
+                                                        [class.sev-medium]="v.severity === 'MEDIUM'"
+                                                        [class.sev-low]="v.severity === 'LOW'">
+                                                        {{ getViolationLabel(v.type) }}
+                                                    </span>
+                                                </td>
                                                 <td>
                                                     <span class="severity-badge"
                                                         [class.sev-low]="v.severity === 'LOW'"

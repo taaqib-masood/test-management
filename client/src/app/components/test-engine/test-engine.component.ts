@@ -634,19 +634,35 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   private captureAndUpload(label: string) {
     const video  = this.videoRef?.nativeElement;
     const canvas = this.canvasRef?.nativeElement;
-    if (!video || !canvas) return;
+    if (!video || !canvas) {
+      console.warn('[SNAPSHOT] Video or canvas element not available');
+      return;
+    }
+    if (video.videoWidth === 0 || video.readyState < 2) {
+      console.warn('[SNAPSHOT] Video not ready yet (videoWidth=0 or readyState<2), skipping');
+      return;
+    }
 
-    canvas.width  = video.videoWidth  || 320;
-    canvas.height = video.videoHeight || 240;
-    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     canvas.toBlob(blob => {
-      if (!blob) return;
+      if (!blob) {
+        console.warn('[SNAPSHOT] Canvas blob is null');
+        return;
+      }
+      console.log(`[SNAPSHOT] Uploading ${label} (${blob.size} bytes)`);
       const fd = new FormData();
       fd.append('snapshot', blob, `${label}_${Date.now()}.jpg`);
       fd.append('label', label);
       this.http.post(`${this.apiUrl}/attempts/${this.attemptId}/snapshot`, fd)
-               .subscribe({ error: e => console.warn('Snapshot upload failed:', e) });
+               .subscribe({
+                 next: () => console.log(`[SNAPSHOT] Uploaded: ${label}`),
+                 error: e => console.warn('[SNAPSHOT] Upload failed:', e)
+               });
     }, 'image/jpeg', 0.7);
   }
 

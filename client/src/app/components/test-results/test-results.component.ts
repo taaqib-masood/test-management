@@ -164,6 +164,23 @@ export class TestResultsComponent implements OnInit {
         });
     }
 
+    getViolationLabel(type: string): string {
+        const labels: Record<string, string> = {
+            'TAB_SWITCH':      'Tab Switch',
+            'WINDOW_BLUR':     'Window Focus Lost',
+            'FULLSCREEN_EXIT': 'Exited Fullscreen',
+            'COPY_ATTEMPT':    'Copy Attempt',
+            'PASTE_ATTEMPT':   'Paste Attempt',
+            'RIGHT_CLICK':     'Right Click',
+            'DEV_TOOLS':       'DevTools Opened',
+            'NO_FACE':         'No Face Detected',
+            'MULTIPLE_FACES':  'Multiple Faces Detected',
+            'TIME_EXPIRED':    'Time Expired',
+            'IDLE':            'Idle Detected',
+        };
+        return labels[type] || type.replace(/_/g, ' ');
+    }
+
     getDifficultyColor(diff: string): string {
         switch (diff) {
             case 'easy': return '#22c55e';

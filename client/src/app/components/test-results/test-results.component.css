@@ -49,6 +49,12 @@
 .sev-high     { background: #fef2f2; color: #dc2626; }
 .sev-critical { background: #4c0519; color: #fecdd3; }
 
+/* Violation type label in table — inherits sev- color, no pill shape */
+.violation-type-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
 /* ── Snapshot viewer ────────────────────────────────────────────────────── */
 .snapshot-grid {
   display: flex;
