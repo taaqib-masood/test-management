@@ -27,3 +27,132 @@
   color: #2196f3;
   font-weight: 700;
 }
+
+/* Proctoring grid */
+.proctoring-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 560px) {
+  .proctoring-grid { grid-template-columns: 1fr; }
+}
+
+.proctor-card {
+  background: #f1f5ff;
+  border: 1px solid #dbe4ff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.proctor-card-full {
+  grid-column: 1 / -1;
+}
+
+.proctor-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #e0e7ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.proctor-icon-red {
+  background: #fee2e2;
+}
+
+.proctor-card h4 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.proctor-card p {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.proctor-card strong {
+  color: #1e293b;
+  font-weight: 700;
+}
+
+/* System check box */
+.system-check-box {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px 18px;
+}
+
+/* Webcam check buttons */
+.btn-webcam {
+  background: #6366f1;
+  color: #fff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-webcam:hover { background: #4f46e5; }
+
+.btn-webcam-done {
+  background: #dcfce7;
+  color: #16a34a;
+  border: 1px solid #bbf7d0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: default;
+  white-space: nowrap;
+}
+
+/* Consent box */
+.consent-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+/* Start button */
+.btn-start-test {
+  background: #16a34a;
+  color: #fff;
+  border: none;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-start-test:hover:not(:disabled) {
+  background: #15803d;
+}
+
+.btn-start-test:disabled {
+  background: #86efac;
+  color: #fff;
+  cursor: not-allowed;
+}

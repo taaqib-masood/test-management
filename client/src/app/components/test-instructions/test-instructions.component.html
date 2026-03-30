@@ -15,51 +15,143 @@
     </div>
 
     <!-- Instructions -->
-    <div *ngIf="!loading && testInfo" class="glass-card container-sm p-10 z-10 relative">
+    <div *ngIf="!loading && testInfo" class="glass-card z-10 relative" style="max-width:720px; width:100%; padding:40px;">
+
+        <!-- Header -->
         <div class="text-center mb-8">
             <h1 class="text-3xl font-extrabold gradient-text mb-2">{{ testInfo.title }}</h1>
             <p class="text-mid font-medium">Assessment Instructions</p>
         </div>
 
-        <!-- Test Details -->
+        <!-- Test Details Badges -->
         <div class="flex-center gap-3 mb-8 flex-wrap">
             <span class="badge badge-primary">⏱ {{ testInfo.duration }} min</span>
             <span class="badge badge-primary">📝 {{ testInfo.totalQuestions }} questions</span>
         </div>
 
-        <!-- Rules -->
+        <!-- General Rules -->
         <div class="rules-container" style="margin-bottom:24px;">
             <h2>📋 Rules &amp; Guidelines</h2>
             <ol class="rules-list">
-                <li>
-                    This is a <strong>timed assessment</strong>.
-                    The timer starts once you click "Start".
-                </li>
-                <li>
-                    Questions include <strong>Multiple Choice (MCQ)</strong>
-                    and <strong>True/False</strong> types.
-                </li>
-                <li>
-                    You can navigate between questions using
-                    <strong>Previous/Next</strong> buttons.
-                </li>
-                <li>
-                    Your progress is <strong>auto-saved</strong> every 10 seconds.
-                </li>
-                <li>
-                    <strong>Do not switch tabs</strong> or exit the browser.
-                    This may auto-submit your test.
-                </li>
-                <li>
-                    When the timer runs out, the test is
-                    <strong>automatically submitted</strong>.
-                </li>
+                <li>This is a <strong>timed assessment</strong>. The timer starts once you click "Start".</li>
+                <li>Questions include <strong>Multiple Choice (MCQ)</strong> and <strong>True/False</strong> types.</li>
+                <li>You can navigate between questions using <strong>Previous/Next</strong> buttons.</li>
+                <li>Your progress is <strong>auto-saved</strong> every 10 seconds.</li>
+                <li><strong>Do not switch tabs</strong> or exit the browser. This may auto-submit your test.</li>
+                <li>When the timer runs out, the test is <strong>automatically submitted</strong>.</li>
             </ol>
         </div>
 
-        <!-- Warning -->
-        <div
-            style="background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:24px;">
+        <!-- Proctoring Requirements -->
+        <div style="margin-bottom:24px;">
+            <h2 style="font-size:16px; font-weight:700; color:#1e293b; margin-bottom:14px; display:flex; align-items:center; gap:8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Proctoring Requirements
+            </h2>
+
+            <div class="proctoring-grid">
+
+                <!-- Webcam/AI -->
+                <div class="proctor-card">
+                    <div class="proctor-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4>Webcam / AI Monitoring</h4>
+                        <p>Continuous facial detection is active. Ensure your face is clearly visible and well-lit throughout the test.</p>
+                    </div>
+                </div>
+
+                <!-- Tab Switching -->
+                <div class="proctor-card">
+                    <div class="proctor-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4>Tab Switching</h4>
+                        <p>Switching tabs or windows is strictly prohibited. You are allowed <strong>{{ maxTabSwitches }}</strong> switch(es) before automatic submission.</p>
+                    </div>
+                </div>
+
+                <!-- Full-Screen -->
+                <div class="proctor-card">
+                    <div class="proctor-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4>Full-Screen Mode</h4>
+                        <p>The test must be taken in Full-Screen mode. Exiting full-screen will trigger a violation and may result in auto-submission.</p>
+                    </div>
+                </div>
+
+                <!-- Restricted Actions -->
+                <div class="proctor-card">
+                    <div class="proctor-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#6366f1" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4>Restricted Actions</h4>
+                        <p>Copying, pasting, right-clicking, and DevTools (F12) are disabled and tracked as violations.</p>
+                    </div>
+                </div>
+
+                <!-- Suspicion Score -->
+                <div class="proctor-card proctor-card-full">
+                    <div class="proctor-icon proctor-icon-red">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#dc2626" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h4>Suspicion Score</h4>
+                        <p>A real-time suspicion score is calculated based on your activity. Reaching <strong>100 points</strong> results in immediate disqualification and automatic submission.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- System Check -->
+        <div class="system-check-box" style="margin-bottom:20px;">
+            <div class="flex-between items-center flex-wrap gap-3">
+                <div>
+                    <h4 style="font-size:14px; font-weight:700; color:#1e293b; margin-bottom:4px;">System Check</h4>
+                    <p style="font-size:13px; color:#475569; margin:0;">Verify your webcam is working before starting.</p>
+                </div>
+                <button (click)="checkWebcam()" [disabled]="webcamChecked || webcamChecking" class="btn btn-sm"
+                    [ngClass]="webcamChecked ? 'btn-webcam-done' : 'btn-webcam'">
+                    <span *ngIf="webcamChecking" class="flex items-center gap-2">
+                        <span class="spinner spinner-sm"></span> Checking...
+                    </span>
+                    <span *ngIf="!webcamChecking && !webcamChecked" class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.069A1 1 0 0121 8.882v6.236a1 1 0 01-1.447.894L15 14M3 8a2 2 0 012-2h10a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V8z" />
+                        </svg>
+                        Test Webcam
+                    </span>
+                    <span *ngIf="!webcamChecking && webcamChecked" class="flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                        Webcam Ready
+                    </span>
+                </button>
+            </div>
+            <p *ngIf="webcamError" class="text-sm" style="color:#dc2626; margin-top:10px;">⚠️ {{ webcamError }}</p>
+        </div>
+
+        <!-- Internet Warning -->
+        <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:var(--radius-md); padding:14px 18px; margin-bottom:20px;">
             <div class="flex gap-3 items-center">
                 <span style="font-size:20px;">⚠️</span>
                 <p class="text-sm font-medium" style="color:#92400e;">
@@ -68,17 +160,32 @@
             </div>
         </div>
 
-        <!-- Good Luck -->
-        <div class="text-center mb-8">
-            <p class="text-lg font-semibold text-dark">Good luck! 🍀</p>
-        </div>
+        <!-- Consent Checkbox -->
+        <label class="consent-box" style="cursor:pointer;">
+            <input type="checkbox" [(ngModel)]="agreedToRules" style="width:18px; height:18px; flex-shrink:0; margin-top:2px; accent-color:#6366f1; cursor:pointer;" />
+            <span style="font-size:14px; color:#1e293b; line-height:1.5;">
+                I have read and understood all the rules and proctoring requirements listed above. I agree to comply with them throughout the assessment.
+            </span>
+        </label>
 
-        <button (click)="startTest()" class="btn btn-primary btn-full btn-lg">
-            Start Assessment
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24"
-                stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
-            </svg>
+        <!-- Start Button -->
+        <button (click)="startTest()" [disabled]="!agreedToRules || !webcamChecked"
+            class="btn btn-full btn-lg btn-start-test">
+            <span class="flex items-center gap-2" style="justify-content:center;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Start Assessment
+            </span>
         </button>
+
+        <p *ngIf="!webcamChecked || !agreedToRules" class="text-center text-xs text-light" style="margin-top:10px;">
+            <span *ngIf="!webcamChecked">Complete the system check</span>
+            <span *ngIf="!webcamChecked && !agreedToRules"> and </span>
+            <span *ngIf="!agreedToRules">accept the proctoring rules</span>
+            <span> to enable Start.</span>
+        </p>
+
     </div>
 </div>

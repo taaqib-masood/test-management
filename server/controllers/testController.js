@@ -251,7 +251,8 @@ const getTestByLink = async (req, res) => {
       hasAccessCode: !!(test.accessCode && test.accessCode.trim()),
       allowMultipleAttempts: test.allowMultipleAttempts,
       expiryDate: test.expiryDate,
-      tabSwitchLimit: test.tabSwitchLimit !== undefined ? test.tabSwitchLimit : 3
+      tabSwitchLimit: test.tabSwitchLimit !== undefined ? test.tabSwitchLimit : 3,
+      antiCheating: test.antiCheating || {}
     });
   } catch (error) {
     console.error('Get Test By Link Error:', error);
