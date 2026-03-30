@@ -57,10 +57,6 @@ export class StudentEntryComponent implements OnInit {
         }
 
         const email = this.studentEmail.trim().toLowerCase();
-        if (!email.endsWith('@ltts.com')) {
-            this.error = 'Only @ltts.com email addresses are allowed';
-            return;
-        }
 
         // ✅ FIX: backend returns 'requiresAccessCode', not 'hasAccessCode'
         if (this.testInfo.requiresAccessCode && !this.accessCode.trim()) {
