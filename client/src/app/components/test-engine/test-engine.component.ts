@@ -79,6 +79,9 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   // ─── DevTools detection ──────────────────────────────────────────────────
   private devToolsOpen = false;
 
+  // ─── Grace period (first 10s: violations logged but not scored) ──────────
+  private sessionStartTime = 0;
+
   private apiUrl = environment.apiUrl;
 
   // ─── Computed helpers ────────────────────────────────────────────────────
@@ -111,6 +114,11 @@ export class TestEngineComponent implements OnInit, OnDestroy {
       this.router.navigate(['/test', this.link]);
       return;
     }
+
+    // ── Request webcam permission NOW (before timer/scoring starts) ──────────
+    // This ensures the browser permission popup fires before violations are tracked.
+    // loadFaceApiAndMonitor() is called once the video is actually playing.
+    this.startWebcam();
 
     this.loadAttemptAndQuestions();
 
@@ -174,8 +182,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
             this.setupCopyPasteBlocker();
             this.setupKeyboardBlocker();
             this.setupDevToolsDetection();
-            // Webcam + face detection
-            this.startWebcam();
+            // Webcam was already started in ngOnInit — no call needed here
           },
           error: () => {
             alert('Failed to load questions.');
@@ -195,6 +202,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   // ═══════════════════════════════════════════════════════════════════════════
 
   startTimer() {
+    this.sessionStartTime = Date.now();
     this.timerSubscription = interval(1000).subscribe(() => {
       if (this.timeLeft > 0) {
         this.timeLeft--;
@@ -368,7 +376,10 @@ export class TestEngineComponent implements OnInit, OnDestroy {
 
     const weight    = VIOLATION_WEIGHTS[type] ?? 10;
     const prevScore = this.suspicionScore;
-    this.suspicionScore = Math.min(999, this.suspicionScore + weight);   // cap display at 999
+    const inGracePeriod = this.sessionStartTime > 0 && (Date.now() - this.sessionStartTime) < 10000;
+    if (!inGracePeriod) {
+      this.suspicionScore = Math.min(999, this.suspicionScore + weight);   // cap display at 999
+    }
 
     // Log it locally
     this.violationLog.push({ type, timestamp: new Date(), score: this.suspicionScore });
@@ -556,15 +567,13 @@ export class TestEngineComponent implements OnInit, OnDestroy {
       const faceapi = await import('face-api.js');
       this._faceapi  = faceapi;
       const MODEL_URL = '/assets/models';   // put face-api models here
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
-      ]);
+      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+      console.log('[FACE-API] tinyFaceDetector model loaded successfully');
       this.faceApiLoaded = true;
       this.captureReferenceImage();
       this.startContinuousMonitoring();
     } catch (e) {
-      console.warn('[FACE-API] Failed to load models:', e);
+      console.error('[FACE-API] Failed to load models:', e);
     }
   }
 
@@ -576,11 +585,12 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   }
 
   private async detectFaces() {
-    if (!this.faceApiLoaded || !this.videoRef?.nativeElement || this.isSubmitting) return;
+    const video = this.videoRef?.nativeElement;
+    if (!this.faceApiLoaded || !video || video.readyState < 2 || this.isSubmitting) return;
 
     try {
       const detections = await this._faceapi.detectAllFaces(
-        this.videoRef.nativeElement,
+        video,
         new this._faceapi.TinyFaceDetectorOptions()
       );
 
