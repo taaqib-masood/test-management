@@ -3,21 +3,12 @@ const Test     = require('../models/Test');
 const User     = require('../models/User');
 const bcrypt   = require('bcryptjs');
 const multer   = require('multer');
-const path     = require('path');
-const fs       = require('fs');
 
 // ─── Multer setup for snapshots ───────────────────────────────────────────────
-const snapshotStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, '../uploads/snapshots');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${req.params.attemptId}_${Date.now()}.jpg`);
-  }
-});
-const snapshotUpload = multer({ storage: snapshotStorage });
+// memoryStorage keeps the file in req.file.buffer — no disk writes.
+// This is required for Render (ephemeral filesystem) and lets us store
+// snapshots as base64 in MongoDB so they survive redeploys.
+const snapshotUpload = multer({ storage: multer.memoryStorage() });
 exports.snapshotUpload = snapshotUpload; // used in routes
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -376,24 +367,45 @@ exports.uploadSnapshot = async (req, res) => {
     const { attemptId } = req.params;
     const label         = req.body.label || 'PERIODIC';
 
-    const attempt = await Attempt.findById(attemptId);
-    if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
-
     if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
-    attempt.snapshots = attempt.snapshots || [];
-    attempt.snapshots.push({
-      label,
-      filename:  req.file.filename,
-      path:      req.file.path,
-      timestamp: new Date()
+    const imageData = req.file.buffer.toString('base64');
+    const filename  = `${attemptId}_${Date.now()}.jpg`;
+
+    // $push atomically appends the snapshot; avoids VersionError from concurrent saves
+    await Attempt.findByIdAndUpdate(attemptId, {
+      $push: {
+        snapshots: { label, filename, imageData, timestamp: new Date() }
+      }
     });
 
-    await attempt.save();
-    res.json({ success: true, filename: req.file.filename });
+    res.json({ success: true, filename });
 
   } catch (err) {
     console.error('uploadSnapshot error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  GET SNAPSHOTS  (admin viewer)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+exports.getSnapshots = async (req, res) => {
+  try {
+    const attempt = await Attempt.findById(req.params.attemptId).select('snapshots');
+    if (!attempt) return res.status(404).json({ message: 'Attempt not found' });
+
+    res.json({
+      snapshots: (attempt.snapshots || []).map(s => ({
+        label:     s.label,
+        filename:  s.filename,
+        imageData: s.imageData,   // base64 JPEG
+        timestamp: s.timestamp
+      }))
+    });
+  } catch (err) {
+    console.error('getSnapshots error:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };

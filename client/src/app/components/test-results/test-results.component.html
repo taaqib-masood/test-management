@@ -273,6 +273,26 @@
                                 style="color:var(--green); font-size:13px; font-weight:600;">
                                 ✅ No violations recorded
                             </div>
+
+                            <!-- Snapshot Viewer -->
+                            <div class="mt-4" *ngIf="attempt.snapshots?.length > 0 || snapshotsMap[attempt._id]">
+                                <button class="btn btn-ghost btn-sm" (click)="loadSnapshots(attempt._id)">
+                                    {{ snapshotsVisible[attempt._id] ? '▲ Hide' : '📸 View' }}
+                                    Snapshots ({{ attempt.snapshots?.length || 0 }})
+                                </button>
+                                <div *ngIf="snapshotsLoading[attempt._id]" class="text-xs text-mid mt-2">Loading snapshots...</div>
+                                <div *ngIf="snapshotsVisible[attempt._id] && !snapshotsLoading[attempt._id]"
+                                    class="snapshot-grid mt-3">
+                                    <div *ngIf="!snapshotsMap[attempt._id]?.length" class="text-xs text-mid">No snapshots stored.</div>
+                                    <div *ngFor="let s of snapshotsMap[attempt._id]" class="snapshot-card">
+                                        <img [src]="'data:image/jpeg;base64,' + s.imageData"
+                                            [alt]="s.label"
+                                            class="snapshot-img" />
+                                        <div class="snapshot-label">{{ s.label }}</div>
+                                        <div class="snapshot-time">{{ s.timestamp | date:'HH:mm:ss' }}</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <h4 class="text-sm font-bold text-dark mb-4 uppercase tracking-wider">

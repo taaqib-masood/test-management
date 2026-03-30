@@ -3,10 +3,11 @@
 const express = require('express');
 const router = express.Router();
 const { protect, admin } = require('../middleware/authMiddleware');
-const Test     = require('../models/Test');
-const Attempt  = require('../models/Attempt');
-const Question = require('../models/Question');
-const xlsx     = require('xlsx');
+const Test             = require('../models/Test');
+const Attempt          = require('../models/Attempt');
+const Question         = require('../models/Question');
+const xlsx             = require('xlsx');
+const attemptController = require('../controllers/attemptController');
 
 // ─── GET /api/admin/stats ────────────────────────────────────────────────────
 router.get('/stats', protect, admin, async (req, res) => {
@@ -259,6 +260,9 @@ router.get('/analytics', protect, admin, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// ─── GET /api/admin/attempts/:attemptId/snapshots ────────────────────────────
+router.get('/attempts/:attemptId/snapshots', protect, admin, attemptController.getSnapshots);
 
 // ─── GET /api/admin/sample-template ─────────────────────────────────────────
 router.get('/sample-template', protect, admin, (req, res) => {

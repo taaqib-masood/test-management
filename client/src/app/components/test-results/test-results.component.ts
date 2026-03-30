@@ -22,6 +22,11 @@ export class TestResultsComponent implements OnInit {
     // Per-question analytics
     questionAnalytics: any[] = [];
 
+    // Snapshot viewer state
+    snapshotsMap:     { [attemptId: string]: any[] }     = {};
+    snapshotsLoading: { [attemptId: string]: boolean }   = {};
+    snapshotsVisible: { [attemptId: string]: boolean }   = {};
+
     constructor(
         private route: ActivatedRoute,
         private router: Router,
@@ -135,6 +140,26 @@ export class TestResultsComponent implements OnInit {
             error: () => {
                 alert('Failed to export results');
                 this.exporting = false;
+            }
+        });
+    }
+
+    loadSnapshots(attemptId: string) {
+        if (this.snapshotsMap[attemptId]) {
+            // Already loaded — just toggle visibility
+            this.snapshotsVisible[attemptId] = !this.snapshotsVisible[attemptId];
+            return;
+        }
+        this.snapshotsLoading[attemptId] = true;
+        this.snapshotsVisible[attemptId] = true;
+        this.api.get(`admin/attempts/${attemptId}/snapshots`).subscribe({
+            next: (data: any) => {
+                this.snapshotsMap[attemptId]    = data.snapshots || [];
+                this.snapshotsLoading[attemptId] = false;
+            },
+            error: () => {
+                this.snapshotsMap[attemptId]    = [];
+                this.snapshotsLoading[attemptId] = false;
             }
         });
     }

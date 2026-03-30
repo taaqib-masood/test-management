@@ -48,3 +48,44 @@
 .sev-medium   { background: #fffbeb; color: #d97706; }
 .sev-high     { background: #fef2f2; color: #dc2626; }
 .sev-critical { background: #4c0519; color: #fecdd3; }
+
+/* ── Snapshot viewer ────────────────────────────────────────────────────── */
+.snapshot-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.snapshot-card {
+  background: #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+  width: 140px;
+  flex-shrink: 0;
+  border: 1px solid #e2e8f0;
+}
+
+.snapshot-img {
+  width: 140px;
+  height: 105px;
+  object-fit: cover;
+  display: block;
+}
+
+.snapshot-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #475569;
+  padding: 3px 6px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.snapshot-time {
+  font-size: 10px;
+  color: #94a3b8;
+  padding: 1px 6px 5px;
+}

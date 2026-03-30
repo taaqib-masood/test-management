@@ -107,7 +107,7 @@ const attemptSchema = new mongoose.Schema({
   snapshots: [{
     label:     String,
     filename:  String,
-    path:      String,
+    imageData: String,   // base64-encoded JPEG — survives Render redeploys
     timestamp: { type: Date, default: Date.now }
   }],
 
