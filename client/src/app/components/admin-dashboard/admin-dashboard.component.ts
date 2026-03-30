@@ -85,6 +85,15 @@ export class AdminDashboardComponent implements OnInit {
         });
     }
 
+    emailInvite(test: any) {
+        const url = this.getShareUrl(test);
+        const accessCodeLine = test.accessCode ? `\nAccess Code: ${test.accessCode}\n` : '';
+        const bodyText = `Hello,\n\nYou have been invited to take the following assessment: ${test.title}.\n\nTest Link: ${url}\n${accessCodeLine}\nPlease ensure you use a stable internet connection.\n\nRegards,\nAssessment Team`;
+        const subject = encodeURIComponent(`Invitation to Assessment: ${test.title}`);
+        const body = encodeURIComponent(bodyText);
+        window.location.href = `mailto:?subject=${subject}&body=${body}`;
+    }
+
     // ── Access code reveal ──────────────────────────────────────────
     toggleCodeVisibility(testId: string, event: Event) {
         event.stopPropagation();

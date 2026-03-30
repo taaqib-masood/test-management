@@ -209,6 +209,10 @@
                                         [style.color]="copiedLink === test._id ? 'var(--green)' : ''">
                                         {{ copiedLink === test._id ? '✓ Copied' : '📋 Link' }}
                                     </button>
+                                    <button (click)="emailInvite(test)" class="btn btn-ghost btn-sm"
+                                        title="Send email invite">
+                                        ✉️ Invite
+                                    </button>
                                     <a [routerLink]="['/admin/test', test._id, 'results']"
                                         class="btn btn-ghost btn-sm text-primary">
                                         📊 Results
