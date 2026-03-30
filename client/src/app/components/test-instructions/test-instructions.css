@@ -134,6 +134,29 @@
   margin-bottom: 20px;
 }
 
+/* Volume meter */
+.volume-meter-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volume-meter-track {
+  flex: 1;
+  height: 8px;
+  background: #e2e8f0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.volume-meter-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #22c55e 0%, #f59e0b 60%, #ef4444 100%);
+  border-radius: 4px;
+  transition: width 0.1s ease;
+  min-width: 2px;
+}
+
 /* Start button */
 .btn-start-test {
   background: #16a34a;

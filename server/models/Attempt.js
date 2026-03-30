@@ -66,7 +66,8 @@ const attemptSchema = new mongoose.Schema({
         'MULTIPLE_FACES',
         'RIGHT_CLICK',       // ✅ new
         'TIME_EXPIRED',      // ✅ new
-        'IDLE'
+        'IDLE',
+        'VOICE_DETECTED'     // ✅ audio monitoring violation
       ]
     },
     weight:    { type: Number, default: 0 },   // ✅ ADDED

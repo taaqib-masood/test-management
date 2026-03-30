@@ -18,6 +18,7 @@ const VIOLATION_WEIGHTS: Record<string, number> = {
   RIGHT_CLICK:     10,
   DEV_TOOLS:       0,   // disabled
   FULLSCREEN_EXIT: 20,
+  VOICE_DETECTED:  20,
 };
 
 const MAX_SUSPICION_SCORE = 100; // auto-submit threshold
@@ -80,6 +81,15 @@ export class TestEngineComponent implements OnInit, OnDestroy {
   devToolsInterval:   any = null;
   private _faceapi:   any = null;     // face-api.js loaded dynamically
 
+  // ─── Audio / microphone monitoring ───────────────────────────────────────
+  private audioStream:   MediaStream | null = null;
+  private audioContext:  AudioContext | null = null;
+  private audioAnalyser: AnalyserNode | null = null;
+  private audioInterval: any = null;
+  private highNoiseStart: number | null = null;
+  private readonly NOISE_HIGH_THRESHOLD = 40;  // 0–255 RMS scale
+  private readonly NOISE_SUSTAINED_MS   = 3000; // 3 seconds of sustained noise
+
   // ─── DevTools detection ──────────────────────────────────────────────────
   private devToolsOpen = false;
 
@@ -119,10 +129,9 @@ export class TestEngineComponent implements OnInit, OnDestroy {
       return;
     }
 
-    // ── Request webcam permission NOW (before timer/scoring starts) ──────────
-    // This ensures the browser permission popup fires before violations are tracked.
-    // loadFaceApiAndMonitor() is called once the video is actually playing.
+    // ── Request webcam + microphone permissions NOW (before violations tracked) ─
     this.startWebcam();
+    this.startAudioMonitoring();
 
     // Clear initialization guard after grace period (webcam popup + fullscreen can blur)
     setTimeout(() => { this.isSystemInitializing = false; }, this.initializationGrace);
@@ -432,6 +441,7 @@ export class TestEngineComponent implements OnInit, OnDestroy {
       RIGHT_CLICK:     '⚠️ Right-click is disabled!',
       DEV_TOOLS:       '⚠️ Developer tools detected!',
       FULLSCREEN_EXIT: '⚠️ Please stay in fullscreen mode!',
+      VOICE_DETECTED:  '⚠️ High background noise detected!',
     };
     return messages[type] || `⚠️ Violation: ${type}`;
   }
@@ -673,12 +683,56 @@ export class TestEngineComponent implements OnInit, OnDestroy {
     this.webcamStream = null;
   }
 
+  // ─── Audio monitoring ─────────────────────────────────────────────────────
+
+  async startAudioMonitoring() {
+    try {
+      this.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.audioContext = new AudioContext();
+      const source = this.audioContext.createMediaStreamSource(this.audioStream);
+      this.audioAnalyser = this.audioContext.createAnalyser();
+      this.audioAnalyser.fftSize = 256;
+      source.connect(this.audioAnalyser);
+
+      const data = new Uint8Array(this.audioAnalyser.frequencyBinCount);
+      this.audioInterval = setInterval(() => {
+        if (this.isSubmitting || !this.audioAnalyser) return;
+        this.audioAnalyser.getByteFrequencyData(data);
+        const rms = data.reduce((s, v) => s + v, 0) / data.length;
+
+        if (rms > this.NOISE_HIGH_THRESHOLD) {
+          if (!this.highNoiseStart) {
+            this.highNoiseStart = Date.now();
+          } else if (Date.now() - this.highNoiseStart >= this.NOISE_SUSTAINED_MS) {
+            this.handleViolation('VOICE_DETECTED');
+            this.highNoiseStart = null; // reset timer after violation fires
+          }
+        } else {
+          this.highNoiseStart = null; // noise dropped — reset
+        }
+      }, 200);
+    } catch {
+      console.warn('[AUDIO] Microphone permission denied or unavailable');
+    }
+  }
+
+  stopAudioMonitoring() {
+    clearInterval(this.audioInterval);
+    this.audioStream?.getTracks().forEach(t => t.stop());
+    this.audioContext?.close();
+    this.audioStream   = null;
+    this.audioContext  = null;
+    this.audioAnalyser = null;
+    this.highNoiseStart = null;
+  }
+
   // ═══════════════════════════════════════════════════════════════════════════
   //  CLEANUP
   // ═══════════════════════════════════════════════════════════════════════════
 
   private cleanupProctoring() {
     this.stopWebcam();
+    this.stopAudioMonitoring();
     clearInterval(this.monitoringInterval);
     clearInterval(this.snapshotInterval);
     clearInterval(this.devToolsInterval);
